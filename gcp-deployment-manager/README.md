@@ -19,14 +19,16 @@ For an overview of Deployment Manager, see https://cloud.google.com/deployment-m
 
 1. Clone this repo
 
-    Clone this repository locally or with [Cloud Shell](https://cloud.google.com/shell/).
+    Clone this repository locally or with [Cloud Shell](https://cloud.google.com/shell/).  
     With Cloud Shell, you can manage your GCP project and resources without installing anything.
 
     [![Open in Cloud Shell](http://gstatic.com/cloudssh/images/open-btn.svg)](https://console.cloud.google.com/cloudshell/open?git_repo=https%3A%2F%2Fgithub.com%2Fdocksal%2Fsandbox-server&page=editor)
 
 1. Configure `gcloud` tool to use your project. Replace `<project-id>` with the project ID
 
+    ```
     gcloud config set project <project-id>
+    ```
 
 ## Deploy the sandbox server
 
@@ -91,7 +93,11 @@ Generate one like this:
 
 View and copy the public key:
 
-    cat ~/.ssh/docksal-sandbox.pub
+```
+cat ~/.ssh/docksal-sandbox.pub
+```
+
+   **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
 
 Use the copied string to set a [project-wide](https://cloud.google.com/compute/docs/instances/adding-removing-ssh-keys#project-wide) public SSH key on GCP.
 
@@ -101,6 +107,9 @@ Set the following variables in the project build settings in your CI:
 
 - `DOCKSAL_HOST_IP` - the external IP of the sandbox server obtained in the previous steps (`<external-ip>`).
 - `DOCKSAL_HOST_SSH_KEY` - copy it from the output of `cat ~/.ssh/docksal-sandbox | base64`
+
+    **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
+
 - `DOCKSAL_HOST_USER` - `build-agent`
 - `REMOTE_BUILD_BASE` - `/home/build-agent/builds`
 
