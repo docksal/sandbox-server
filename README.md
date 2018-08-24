@@ -1,2 +1,1 @@
-# sandbox-server
-Docksal Sandbox Server templates
+# Docksal Sandbox Server templates
