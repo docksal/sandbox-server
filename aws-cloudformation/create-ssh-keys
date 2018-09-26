@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# This script generate ssh keys for aws
+# Generated keys will be stored in .ssh directory
+# Or you can add your existing ssh keys in aws UI
+#
+
+[ "$1" != "" ] && { keyname=$1; } || { echo "Usage: $0 keyname"; exit; }
+
+mkdir -p .ssh
+
+[ ! -f .ssh/$keyname.key ] && openssl genrsa -out .ssh/$keyname.key 4096
+chmod 600 .ssh/$keyname.key
+ssh-keygen -y -f .ssh/$keyname.key > .ssh/$keyname.pub
