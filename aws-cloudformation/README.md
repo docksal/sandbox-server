@@ -50,7 +50,7 @@ Navigate to the `aws-cloudformation` folder:
 
 Launch the deployment:
 
-   ./create-stack <test-server>
+    ./create-stack <test-server>
 
 In the output of the command you'll find the server public IP address:
 
