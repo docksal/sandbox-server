@@ -3,8 +3,9 @@
 # This script create aws stack using template file template.json
 #
 
-[ "$1" != "" ] && { stack_name=$1; } || { echo "Usage: $0 stack-name"; exit; }
+[ "$1" != "" ] && [ "$2" != "" ] || { echo "Usage: $0 stack-name keyname [instancetype]"; exit; }
+[ "$3" != "" ] && instance_type_opt="ParameterKey=InstanceType,ParameterValue=$3"
 
-aws cloudformation create-stack --stack-name $stack_name --template-body file://template.json >/dev/null && echo "Creation stack $stack_name is in progress..." || exit 1
-aws cloudformation wait stack-create-complete --stack-name $stack_name && echo "Stack $stack_name created!" || { echo "Timeout creation stack $stack_name"; exit 1; }
-aws cloudformation describe-stacks --stack-name $stack_name
+aws cloudformation create-stack --stack-name $1 --template-body file://template.json --parameters ParameterKey=KeyName,ParameterValue=$2 $instance_type_opt >/dev/null && echo "Creation stack $1 is in progress..." || exit 1
+aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack $1 created!" || { echo "Timeout creation stack $1"; exit 1; }
+aws cloudformation describe-stacks --stack-name $1

@@ -40,8 +40,6 @@ Execute:
     ./create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
     ./import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
 
-Replace `$keyname` in template.json with your <keyname>
-
 ## Deploy the sandbox server
 
 Navigate to the `aws-cloudformation` folder:
@@ -50,7 +48,7 @@ Navigate to the `aws-cloudformation` folder:
 
 Launch the deployment:
 
-    ./create-stack <test-server>
+    ./create-stack <stack-name> <keyname> [<instancetype>]
 
 In the output of the command you'll find the server public IP address:
 
