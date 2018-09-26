@@ -17,7 +17,7 @@ For an overview of AWS CloudFormation, see https://docs.aws.amazon.com/AWSCloudF
 
 1. [Create Access Keys for Your AWS Account Root User](https://docs.aws.amazon.com/general/latest/gr/managing-aws-access-keys.html). Keep these keys in a safe place!
 
-1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair). You can skip this step and use create-ssh-keys/import-ssh-keys scripts from this repo.
+1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair). You can skip this step and use `create-ssh-keys/import-ssh-keys` scripts from this repo.
 
 1. Install on you local PC aws cli tool (for ubuntu run `sudo apt install awscli`)
 
@@ -37,7 +37,7 @@ Navigate to the `aws-cloudformation` folder:
 
 Execute:
 
-    ./create-ssh-keys <keyname> - this will create new ssh key pairs in .ssh folder
+    ./create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
     ./import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
 
 Replace `$keyname` in template.json with your <keyname>
