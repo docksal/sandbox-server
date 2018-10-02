@@ -4,7 +4,8 @@
 # Script output must be inserted in template.json in section UserData
 #
 
-[ "$1" == "" ] && { echo "Usage: $0 script filename"; exit; }
+[[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
 
-cat $1 | sed 's/"/\\"/g' | awk '{print "        \""$0"\\n\","}'
+echo "        "
+sed 's/"/\\"/g' $1 | awk '{print "        \""$0"\\n\","}'
 echo "        \"\n\""

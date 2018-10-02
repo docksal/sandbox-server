@@ -12,7 +12,7 @@
       "Description" : "EC2 instance type",
       "Type" : "String",
       "Default" : "t2.micro",
-      "AllowedValues" : [ "t1.micro", "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "c1.medium", "c1.xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "g2.2xlarge", "g2.8xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge", "cg1.4xlarge"],
+      "AllowedValues" : [ "t1.micro", "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t3.nano", "t3.micro", "t3.small", "t3.medium", "t3.large", "t3.xlarge", "t3.xlarge", "t3.2xlarge", "m1.small", "m1.medium", "m1.large", "m1.xlarge", "m2.xlarge", "m2.2xlarge", "m2.4xlarge", "m3.medium", "m3.large", "m3.xlarge", "m3.2xlarge", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "c1.medium", "c1.xlarge", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge", "g2.2xlarge", "g2.8xlarge", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge", "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge", "hi1.4xlarge", "hs1.8xlarge", "cr1.8xlarge", "cc2.8xlarge", "cg1.4xlarge"],
       "ConstraintDescription" : "must be a valid EC2 instance type."
     }
   },
@@ -63,6 +63,17 @@
           }]
       }
     },
+    "IPAddress" : {
+      "Type" : "AWS::EC2::EIP"
+    },
+
+    "IPAssoc" : {
+      "Type" : "AWS::EC2::EIPAssociation",
+      "Properties" : {
+        "InstanceId" : { "Ref" : "EC2Instance" },
+        "EIP" : { "Ref" : "IPAddress" }
+      }
+    },
 
     "EC2Instance" : {
       "Type" : "AWS::EC2::Instance",
@@ -80,134 +91,11 @@
             "Ebs" : { "VolumeSize" : "100" }
           }
         ],
-	"UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+	"UserData" : { "Fn::Base64" : { "Fn::Join" : [ "", [ "IPAddress=", {"Ref" : "IPAddress"}]]}},
+	"UserData" : { "Fn::Base64" : { "Fn::Join" : [ "", [
 
 
-        "#!/bin/bash\n",
-        "\n",
-        "# This is a startup script for a Docksal Sandbox server in GCP.\n",
-        "# It installs and configures Docksal on a bare Ubuntu machine (tested with Ubuntu 18.04 Minimal).\n",
-        "#\n",
-        "# The startup script log can be views via \"gcloud compute ssh vm-sandbox-test -- tail -f /var/log/syslog\"\n",
-        "\n",
-        "set -x  # Print commands\n",
-        "set -e  # Fail on errors\n",
-        "\n",
-        "# Persistent disk settings\n",
-        "DATA_DISK=\"/dev/xvdp\"\n",
-        "MOUNT_POINT=\"/mnt/data\"\n",
-        "BUILD_USER=\"build-agent\"\n",
-        "BUILD_USER_UID=\"1100\"\n",
-        "BUILD_USER_HOME=\"/home/${BUILD_USER}\"\n",
-        "DATA_BUILD_USER_HOME=\"${MOUNT_POINT}${BUILD_USER_HOME}\"\n",
-        "DOCKSAL_VERSION=\"master\"\n",
-        "PROJECT_INACTIVITY_TIMEOUT=\"0.5h\"\n",
-        "PROJECT_DANGLING_TIMEOUT=\"168h\"\n",
-        "PROJECTS_ROOT=\"${BUILD_USER_HOME}/builds\"\n",
-        "\n",
-        "# Create build-agent user with no-password sudo access (google-sudoers group)\n",
-        "# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.\n",
-        "# (Otherwise, we may run into something like \"useradd: UID 1001 is not unique\")\n",
-        "if [[ \"$(id -u ${BUILD_USER})\" != \"${BUILD_USER_UID}\" ]]; then\n",
-        "    adduser --disabled-password --gecos \"\" --uid ${BUILD_USER_UID} ${BUILD_USER}\n",
-        "    usermod -aG sudo ${BUILD_USER}\n",
-        "    echo \"${BUILD_USER} ALL=(ALL) NOPASSWD:ALL\" >/etc/sudoers.d/101-${BUILD_USER}\n",
-        "fi\n",
-        "\n",
-        "# Mount the persistent data disk if it was attached\n",
-        "if lsblk ${DATA_DISK} > /dev/null 2>&1; then\n",
-        "    echo \"Using persistent disk: ${DATA_DISK} for data storage: ${MOUNT_POINT}\"\n",
-        "\n",
-        "    # Format the disk if necessary\n",
-        "    if [[ $(lsblk -f ${DATA_DISK}) != *ext4* ]]; then\n",
-        "    sudo mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}\n",
-        "    fi\n",
-        "\n",
-        "    # Mount the data disk\n",
-        "    mkdir -p ${MOUNT_POINT}\n",
-        "    cp /etc/fstab /etc/fstab.backup\n",
-        "    # Write disk mount to /etc/fstab (so that it persists on reboots)\n",
-        "    # Equivalent of `mount /dev/sdb /mnt/data`\n",
-        "    echo \"${DATA_DISK}  ${MOUNT_POINT}  ext4  defaults,nofail  0 2\" | tee -a /etc/fstab\n",
-        "    mount -a\n",
-        "\n",
-        "    # Move BUILD_USER_HOME to the data disk\n",
-        "    # E.g. /home/ubuntu => /mnt/data/home/ubuntu\n",
-        "    if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then\n",
-        "    mkdir -p $(dirname ${DATA_BUILD_USER_HOME})\n",
-        "    mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})\n",
-        "    else\n",
-        "    rm -rf ${BUILD_USER_HOME}\n",
-        "    fi\n",
-        "    ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}\n",
-        "\n",
-        "    # Symlink /var/lib/docker (should not yet exist when this script runs) to the data volume\n",
-        "    mkdir -p ${MOUNT_POINT}/var/lib/docker\n",
-        "    ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker\n",
-        "else\n",
-        "    echo \"WARNING: data volume not found. Using instance-only storage\"\n",
-        "fi\n",
-        "\n",
-        "# Create the projects/builds directory\n",
-        "mkdir -p ${PROJECTS_ROOT}\n",
-        "\n",
-        "# SSH settings: disable the host key check\n",
-        "if [[ ! -f \"${BUILD_USER_HOME}/.ssh/config\" ]]; then\n",
-        "    mkdir -p ${BUILD_USER_HOME}/.ssh\n",
-        "    tee \"${BUILD_USER_HOME}/.ssh/config\" <<EOF\n",
-        "Host *\n",
-        "  StrictHostKeyChecking no\n",
-        "  UserKnownHostsFile=/dev/null\n",
-        "  LogLevel ERROR\n",
-        "EOF\n",
-        "    chmod 600 \"${BUILD_USER_HOME}/.ssh/config\"\n",
-        "fi\n",
-        "\n",
-        "# Sandbox settings (set these before installing Docksal)\n",
-        "# Note: do nothing if docksal.env exists from a previos installation (persistent data disk)\n",
-        "if [[ ! -f ${BUILD_USER_HOME}/.docksal/docksal.env ]]; then\n",
-        "    mkdir -p ${BUILD_USER_HOME}/.docksal\n",
-        "    tee ${BUILD_USER_HOME}/.docksal/docksal.env <<EOF\n",
-        "CI=1\n",
-        "PROJECT_INACTIVITY_TIMEOUT=\"${PROJECT_INACTIVITY_TIMEOUT}\"\n",
-        "PROJECT_DANGLING_TIMEOUT=\"${PROJECT_DANGLING_TIMEOUT}\"\n",
-        "PROJECTS_ROOT=\"${PROJECTS_ROOT}\"\n",
-        "EOF\n",
-        "    # Fix permissions\n",
-        "    #chown ${BUILD_USER}:${BUILD_USER} ${BUILD_USER_HOME}/.docksal/docksal.env\n",
-        "fi\n",
-        "\n",
-        "# Fix permissions, since we are running as root here\n",
-        "# Trailing slash in necessary here, since BUILD_USER_HOME is a symlink\n",
-        "chown -R ${BUILD_USER}:${BUILD_USER} \"${BUILD_USER_HOME}/\"\n",
-        "\n",
-        "# Unlock updates\n",
-        "# Necessary with existing installations (persistent data disk)\n",
-        "sed -i '/DOCKSAL_LOCK_UPDATES/d' \"${BUILD_USER_HOME}/.docksal/docksal.env\" || true\n",
-        "\n",
-        "# Install/update Docksal and dependencies\n",
-        "\n",
-        "sudo -u ${BUILD_USER} sh -c \"curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOCKSAL_VERSION} bash\"\n",
-        "\n",
-        "# Lock updates (protect against unintentional updates in builds)\n",
-        "echo \"DOCKSAL_LOCK_UPDATES=1\" | tee -a \"${BUILD_USER_HOME}/.docksal/docksal.env\"\n",
-        "\n",
-        "## This has to be done under the ubuntu user to load Docker Hub credentials\n",
-        "#su - ubuntu -c 'docker run --rm -v /home/ubuntu:/data ffwagency/us-east-ci'\n",
-        "#chown -R ubuntu:ubuntu /home/ubuntu/  # Trailing slash is important (when using a symlink)\n",
-        "#chmod 600 /home/ubuntu/.ssh/id_rsa\n",
-        "#rm -rf /home/ubuntu/.git\n",
-        "\n",
-        "## Reset Docksal system services to apply settings\n",
-        "# su - ${BUILD_USER} -c \"fin system reset\"\n",
-        "\n",
-        "# Install Git LFS client\n",
-        "# curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash\n",
-        "# apt-get -y install git-lfs </dev/null\n"
-
-
-
-        ]]}}
+	]]}}
       }
     }
   },
@@ -215,8 +103,8 @@
     "InstanceID" : {
       "Value" : { "Ref" : "EC2Instance" }
     },
-    "PublicIp" : {
-      "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicIp" ]}
+    "InstanceIPAddress" : {
+      "Value" : { "Ref" : "IPAddress" }
     }
   }
 }

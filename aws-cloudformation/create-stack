@@ -3,9 +3,21 @@
 # This script create aws stack using template file template.json
 #
 
-[ "$1" != "" ] && [ "$2" != "" ] || { echo "Usage: $0 stack-name keyname [instancetype]"; exit; }
-[ "$3" != "" ] && instance_type_opt="ParameterKey=InstanceType,ParameterValue=$3"
+template_file="template.json"
 
-aws cloudformation create-stack --stack-name $1 --template-body file://template.json --parameters ParameterKey=KeyName,ParameterValue=$2 $instance_type_opt >/dev/null && echo "Creation stack $1 is in progress..." || exit 1
+[[ "$1" != "" ]] && [[ "$2" != "" ]] || { echo "Usage: $0 stack-name keyname [instancetype]"; exit; }
+[[ "$3" != "" ]] && instance_opt="ParameterKey=InstanceType,ParameterValue=$3"
+
+if [ -f "startup.sh" ];
+then
+    line_num=`grep -n "^[[:space:]]*\"UserData\" : { \"Fn::Base64\" : { \"Fn::Join\" : \[ \"\", \[$" ${template_file} | cut -d':' -f 1`
+    head -n ${line_num} ${template_file} >_$$.json
+    ./scripts/bash2json startup.sh >>_$$.json
+    tail -n +$(expr ${line_num} + 1) ${template_file} >>_$$.json
+    template_file="_$$.json"
+    trap "rm -f _$$.json" EXIT
+fi
+
+aws cloudformation create-stack --stack-name $1 --template-body file://${template_file} --parameters ParameterKey=KeyName,ParameterValue=$2 ${instance_opt} >/dev/null && echo "Creation stack $1 is in progress..." || exit 1
 aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack $1 created!" || { echo "Timeout creation stack $1"; exit 1; }
 aws cloudformation describe-stacks --stack-name $1
