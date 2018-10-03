@@ -75,4 +75,4 @@ Docksal is installed under the `build-agent` user account on the server. Sandbox
 
 To delete the deployment and all the resources that were created:
 
-    ./delete-stack <test-server>
+    ./delete-stack <stack-name>
