@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# This script converts bash scripts to yaml format and create ready to deploy template.yaml
+#
+
+[[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
+
+template_file="template.yaml.tpl"
+
+line_num=`grep -n "^[[:space:]]*- - |" ${template_file} | cut -d':' -f 1`
+head -n ${line_num} ${template_file} >template.yaml
+sed 's/^/              /g' $1 >>template.yaml
+tail -n +$(expr ${line_num} + 1) ${template_file} >>template.yaml
+
+

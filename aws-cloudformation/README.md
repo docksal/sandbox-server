@@ -46,13 +46,21 @@ Navigate to the `aws-cloudformation` folder:
 
     cd aws-cloudformation
 
+Create template ready for deploy:
+
+    ./scripts/bash2yaml startup.sh - will create template file template.yaml with startup.sh merged in it
+    ./scripts/bash2json startup.sh - will create template file template.json with startup.sh merged in it
+
+By default create-stack script use template.yaml. If you want using template in json format you can edit
+create-stack script and change the value of the `template_file` variable to the preferred template format.
+
 Launch the deployment:
 
     ./create-stack <stack-name> <keyname> [<instancetype>]
 
 In the output of the command you'll find the server public IP address:
 
-    PublicIp <external-ip>
+    InstanceIPAddress <external-ip>
 
 ## Access the sandbox server
 

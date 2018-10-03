@@ -91,7 +91,6 @@
             "Ebs" : { "VolumeSize" : "100" }
           }
         ],
-	"UserData" : { "Fn::Base64" : { "Fn::Join" : [ "", [ "IPAddress=", {"Ref" : "IPAddress"}]]}},
 	"UserData" : { "Fn::Base64" : { "Fn::Join" : [ "", [
 
 
