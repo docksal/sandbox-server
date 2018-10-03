@@ -37,8 +37,8 @@ Navigate to the `aws-cloudformation` folder:
 
 Execute:
 
-    ./create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
-    ./import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
+    ./scripts/create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
+    ./scripts/import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
 
 ## Deploy the sandbox server
 
