@@ -163,3 +163,5 @@ Outputs:
     Value: !Ref EC2Instance
   InstanceIPAddress:
     Value: !Ref IPAddress
+  InstanceURL:
+    Value: !Join [ '', [ 'https://', !Ref IPAddress, '.nip.io' ] ]
