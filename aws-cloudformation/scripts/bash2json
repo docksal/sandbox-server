@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# This script converts bash scripts to json format and create ready to deploy template.json
+#
+
+[[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
+
+template_file="template.json.tpl"
+
+line_num=`grep -n "^[[:space:]]*\"UserData\" : { \"Fn::Base64\" : { \"Fn::Join\" : \[ \"\", \[$" ${template_file} | cut -d':' -f 1`
+head -n ${line_num} ${template_file} >template.json
+echo "        " >>template.json
+sed 's/"/\\"/g' $1 | awk '{print "        \""$0"\\n\","}' >>template.json
+echo "        \"\n\"" >>template.json
+tail -n +$(expr ${line_num} + 1) ${template_file} >>template.json
+
+

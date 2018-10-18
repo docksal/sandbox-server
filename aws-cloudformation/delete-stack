@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# This script delete aws stack
+#
+
+[[ $1 != "" ]] && { stack_name=$1; } || { echo "Usage: $0 stack-name"; exit; }
+
+aws cloudformation delete-stack --stack-name "${stack_name}" && echo "Deletion stack $stack_name is in progress..." || exit 1
+aws cloudformation wait stack-delete-complete --stack-name ${stack_name} && echo "Stack ${stack_name} deleted" || { echo "Timeout deletion stack ${stack_name}"; exit 1; }
+

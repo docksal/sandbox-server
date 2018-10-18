@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# This script create aws stack using template file template.json
+#
+
+template_file="template.yaml"
+
+[[ "$1" != "" ]] && [[ "$2" != "" ]] || { echo "Usage: $0 stack-name keyname [instancetype]"; exit; }
+[[ "$3" != "" ]] && instance_opt="ParameterKey=InstanceType,ParameterValue=$3"
+
+aws cloudformation create-stack --stack-name $1 --template-body file://${template_file} --parameters ParameterKey=KeyName,ParameterValue=$2 ${instance_opt} >/dev/null && echo "Creation stack $1 is in progress..." || exit 1
+aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack $1 created!" || { echo "Timeout creation stack $1"; exit 1; }
+aws cloudformation describe-stacks --stack-name $1
