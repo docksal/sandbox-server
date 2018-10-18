@@ -5,7 +5,7 @@
 
 [[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
 
-template_file="template.yaml.tpl"
+template_file="template.tpl.yaml"
 
 line_num=`grep -n "^[[:space:]]*- - |" ${template_file} | cut -d':' -f 1`
 head -n ${line_num} ${template_file} >template.yaml
