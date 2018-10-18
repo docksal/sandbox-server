@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Sandbox server template
 Parameters:
-  KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
-    Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: must be the name of an existing EC2 KeyPair.
   InstanceType:
     Description: EC2 instance type
     Type: String
@@ -73,6 +69,16 @@ Parameters:
       - cc2.8xlarge
       - cg1.4xlarge
     ConstraintDescription: must be a valid EC2 instance type.
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  PersistentDiskSize:
+    Description: Persistent volume size (GiB)
+    Type: Number
+    MinValue: 20
+    MaxValue: 1024
+    Default: 100
 Mappings:
   Region2AMI:
     ap-south-1:
@@ -147,7 +153,7 @@ Resources:
             VolumeSize: '8'
         - DeviceName: /dev/sdp
           Ebs:
-            VolumeSize: '100'
+            VolumeSize: !Ref PersistentDiskSize
       UserData: !Base64
         'Fn::Join':
           - ''
