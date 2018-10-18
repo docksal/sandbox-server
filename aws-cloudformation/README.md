@@ -11,7 +11,25 @@ AWS CloudFormation handles all of that.
 
 For an overview of AWS CloudFormation, see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.
 
-## Initial setup on AWS CloudFormation
+## Quick setup (using CloudFormation web UI)
+
+If you have an existing AWS account (with billing and an SSH key pair), just click on the button below!
+
+[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/stable/template.yaml)
+
+You will be prompted for:
+
+- Instance type
+- SSH key name
+
+Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation. 
+
+
+## Manual setup (using console tools)  
+
+Step-by-step manual setup instructions using aws cli and provisioning scripts. 
+
+### Initial setup on AWS CloudFormation
 
 1. Log in or create a new AWS account.
 
@@ -29,7 +47,7 @@ For an overview of AWS CloudFormation, see https://docs.aws.amazon.com/AWSCloudF
     aws configure
     ```
 
-## Creating SSH key pair and import to AWS EC2
+### Creating SSH key pair and import to AWS EC2
 
 Navigate to the `aws-cloudformation` folder:
 
@@ -40,7 +58,7 @@ Execute:
     ./scripts/create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
     ./scripts/import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
 
-## Deploy the sandbox server
+### Deploy the sandbox server
 
 Navigate to the `aws-cloudformation` folder:
 
@@ -62,7 +80,7 @@ In the output of the command you'll find the server public IP address:
 
     InstanceIPAddress <external-ip>
 
-## Access the sandbox server
+### Access the sandbox server
 
 SSH into the server and switch to the `build-agent` user:
 
@@ -71,7 +89,7 @@ SSH into the server and switch to the `build-agent` user:
 
 Docksal is installed under the `build-agent` user account on the server. Sandbox builds MUST run as this user.
 
-## Delete the sandbox server
+### Delete the sandbox server
 
 To delete the deployment and all the resources that were created:
 
