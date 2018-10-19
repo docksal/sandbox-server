@@ -1,18 +1,28 @@
-language: minimal
+# Use python, since we install and use aws cli during the build
+language: python
+python:
+  - "3.6"
+
+env:
+  global:
+    - AWS_REGION=us-east-2
+    - AWS_ACCESS_KEY_ID=AKIAIPJXMNOEV65OMURA
+    # Encrypted AWS_SECRET_ACCESS_KEY
+    - secure: "KGqbZdK65Z/fwuM8XkIO7awap+hastKvpAXJPe1FvwwZ9QGK+t9ZDljyIN8oSZdEPH4te7opo5D5LxNVVbFuTfnQ4P3Mikl7aOoGQi39wx5XmBueeQB+r/fl1GjkOoRcHyLmRRbeP4Ux/VDG2cCNUsS9q/s6kqsf8k0RmcpDMn0tBef/CixdnTfoQxO8QOgDCoBt+ErBamgt/HFWM89bw4uaehXwoevgArVkaiFyyJv3xBpKRAWKYPuwxCc9iadbb13SiPbs5qx0lQulrYLzf3qkQKBBJRGAPysC7uITW10TY/KjxmHA4S6+Z67P5GK5khZ55xsC86gz0fgWHFCdflbu46kS2bkAozEf9HnU3cDV3sHMgPyIOaAgGwmYjcDjwE+oxa54sTfzEwZ1yAKY3twwDiKue/4hdaHVknoWUJdjL7s5fOS3XXl3g8pHsRvzAx9XO8ZAOv7n2Pf0UvGbgklbTgDQO+Vvi7jDJb1yXGT6o9YFTpazpj5R3kU1Nf3V28zNQ8/OGqKssKghgT/9Cm1DqZIWWiPHmbkF6Q7e/HBSgTLaRd/PI//C/pSlc25TO/vQ+hBoqdxZ/1FCDDiCpLCXxd1b33ea3HUKBtmKKtSWDYGo6VVI8X+PCx7DvzpWIX85xgLhvloTUeNUL4ly/dcVhuEDiq5eWGHdcw20NmY="
 
 install:
-  - pip install --user awscli
+  - pip install awscli --upgrade
 
 script:
   - cd aws-cloudformation && ./scripts/bash2yaml startup.sh
   - mkdir -p build && mv -f template.yaml build
-  - aws cloudformation validate-template --template-body file://${$TRAVIS_BUILD_DIR}/aws-cloudformation/build/template.yaml
+  - aws cloudformation validate-template --region ${AWS_REGION} --template-body file://build/template.yaml
 
 deploy:
   - provider: s3
-    access_key_id: AKIAIPJXMNOEV65OMURA
-    secret_access_key:
-      secure: PyQwDSLQWUUErRAQ79j2h1mVWMbG42e3/EtuPZAoa7jN4Bp2YCzzZmCqXnMIoWWi2C0Xc23ljTA1kDRZKb5tIl3uG3dhs5QRPoSEqDWr5N8p+zR/eH6EU6qvOPVui5Nub/XBhFmBEWvwTaCRWGRc14LdJLB5fwAd1hVLbJDYbx7LoQPcRL1QNO8kH6tWkoej5V5wHvD7tzJtHNnZj6/+ExPrmZ9pPbgleMhsd2x/RuRp2X5dEFZZCEhIA8neZweGG8ZX2VjpjedzbxklVrnyK689V/hItjENXpBmCNcBqA3JkABKKxBuObWHlBzJG31brOkgC0urkqYo2gGRj1zFBV9UXx+lo4g79DwoOJ6wftGPSaF9+dDS4nqQh+tBOSEinLsU5iyHJW7oe9hwOPvGjQGqp0Z8lD3Hffke27jiJXFEaZqiW7YZjYBpmqSY64jELFrEL9ULl2J84o3BAI67jffiA6qfLd2Ay8jpxABa+D+dTpvyR9sbdghYQUKagW+eATCDWs4qQrP4jx0XWeevFiNkdgBkn3aRZFDwI3L1+z0WoNgvYLDN9O+sBqFzQmbqqfXUKO8SvDC6MsGh3r2MVMpbQIoYAdiMAbpOJxchLMwl0UPNeS7k3jVU01kbfQSAuwqoZG9+p3k7KKXjr50i6HqfiKmOqPQg35OGUhAxu9Q=
+    region: "${AWS_REGION}"
+    access_key_id: "${AWS_ACCESS_KEY_ID}"
+    secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
     bucket: docksal-aws-templates
     skip_cleanup: true
     acl: public_read
@@ -22,9 +32,9 @@ deploy:
       repo: docksal/sandbox-server
       branch: develop
   - provider: s3
-    access_key_id: AKIAIPJXMNOEV65OMURA
-    secret_access_key:
-      secure: PyQwDSLQWUUErRAQ79j2h1mVWMbG42e3/EtuPZAoa7jN4Bp2YCzzZmCqXnMIoWWi2C0Xc23ljTA1kDRZKb5tIl3uG3dhs5QRPoSEqDWr5N8p+zR/eH6EU6qvOPVui5Nub/XBhFmBEWvwTaCRWGRc14LdJLB5fwAd1hVLbJDYbx7LoQPcRL1QNO8kH6tWkoej5V5wHvD7tzJtHNnZj6/+ExPrmZ9pPbgleMhsd2x/RuRp2X5dEFZZCEhIA8neZweGG8ZX2VjpjedzbxklVrnyK689V/hItjENXpBmCNcBqA3JkABKKxBuObWHlBzJG31brOkgC0urkqYo2gGRj1zFBV9UXx+lo4g79DwoOJ6wftGPSaF9+dDS4nqQh+tBOSEinLsU5iyHJW7oe9hwOPvGjQGqp0Z8lD3Hffke27jiJXFEaZqiW7YZjYBpmqSY64jELFrEL9ULl2J84o3BAI67jffiA6qfLd2Ay8jpxABa+D+dTpvyR9sbdghYQUKagW+eATCDWs4qQrP4jx0XWeevFiNkdgBkn3aRZFDwI3L1+z0WoNgvYLDN9O+sBqFzQmbqqfXUKO8SvDC6MsGh3r2MVMpbQIoYAdiMAbpOJxchLMwl0UPNeS7k3jVU01kbfQSAuwqoZG9+p3k7KKXjr50i6HqfiKmOqPQg35OGUhAxu9Q=
+    region: "${AWS_REGION}"
+    access_key_id: "${AWS_ACCESS_KEY_ID}"
+    secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
     bucket: docksal-aws-templates
     skip_cleanup: true
     acl: public_read
