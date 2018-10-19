@@ -1,0 +1,35 @@
+language: minimal
+
+install:
+  - pip install --user awscli
+
+script:
+  - cd aws-cloudformation && ./scripts/bash2yaml startup.sh
+  - mkdir -p build && mv -f template.yaml build
+  - aws cloudformation validate-template --template-body file://${$TRAVIS_BUILD_DIR}/aws-cloudformation/build/template.yaml
+
+deploy:
+  - provider: s3
+    access_key_id: AKIAIPJXMNOEV65OMURA
+    secret_access_key:
+      secure: PyQwDSLQWUUErRAQ79j2h1mVWMbG42e3/EtuPZAoa7jN4Bp2YCzzZmCqXnMIoWWi2C0Xc23ljTA1kDRZKb5tIl3uG3dhs5QRPoSEqDWr5N8p+zR/eH6EU6qvOPVui5Nub/XBhFmBEWvwTaCRWGRc14LdJLB5fwAd1hVLbJDYbx7LoQPcRL1QNO8kH6tWkoej5V5wHvD7tzJtHNnZj6/+ExPrmZ9pPbgleMhsd2x/RuRp2X5dEFZZCEhIA8neZweGG8ZX2VjpjedzbxklVrnyK689V/hItjENXpBmCNcBqA3JkABKKxBuObWHlBzJG31brOkgC0urkqYo2gGRj1zFBV9UXx+lo4g79DwoOJ6wftGPSaF9+dDS4nqQh+tBOSEinLsU5iyHJW7oe9hwOPvGjQGqp0Z8lD3Hffke27jiJXFEaZqiW7YZjYBpmqSY64jELFrEL9ULl2J84o3BAI67jffiA6qfLd2Ay8jpxABa+D+dTpvyR9sbdghYQUKagW+eATCDWs4qQrP4jx0XWeevFiNkdgBkn3aRZFDwI3L1+z0WoNgvYLDN9O+sBqFzQmbqqfXUKO8SvDC6MsGh3r2MVMpbQIoYAdiMAbpOJxchLMwl0UPNeS7k3jVU01kbfQSAuwqoZG9+p3k7KKXjr50i6HqfiKmOqPQg35OGUhAxu9Q=
+    bucket: docksal-aws-templates
+    skip_cleanup: true
+    acl: public_read
+    local_dir: build
+    upload-dir: sandbox-server/edge
+    on:
+      repo: docksal/sandbox-server
+      branch: develop
+  - provider: s3
+    access_key_id: AKIAIPJXMNOEV65OMURA
+    secret_access_key:
+      secure: PyQwDSLQWUUErRAQ79j2h1mVWMbG42e3/EtuPZAoa7jN4Bp2YCzzZmCqXnMIoWWi2C0Xc23ljTA1kDRZKb5tIl3uG3dhs5QRPoSEqDWr5N8p+zR/eH6EU6qvOPVui5Nub/XBhFmBEWvwTaCRWGRc14LdJLB5fwAd1hVLbJDYbx7LoQPcRL1QNO8kH6tWkoej5V5wHvD7tzJtHNnZj6/+ExPrmZ9pPbgleMhsd2x/RuRp2X5dEFZZCEhIA8neZweGG8ZX2VjpjedzbxklVrnyK689V/hItjENXpBmCNcBqA3JkABKKxBuObWHlBzJG31brOkgC0urkqYo2gGRj1zFBV9UXx+lo4g79DwoOJ6wftGPSaF9+dDS4nqQh+tBOSEinLsU5iyHJW7oe9hwOPvGjQGqp0Z8lD3Hffke27jiJXFEaZqiW7YZjYBpmqSY64jELFrEL9ULl2J84o3BAI67jffiA6qfLd2Ay8jpxABa+D+dTpvyR9sbdghYQUKagW+eATCDWs4qQrP4jx0XWeevFiNkdgBkn3aRZFDwI3L1+z0WoNgvYLDN9O+sBqFzQmbqqfXUKO8SvDC6MsGh3r2MVMpbQIoYAdiMAbpOJxchLMwl0UPNeS7k3jVU01kbfQSAuwqoZG9+p3k7KKXjr50i6HqfiKmOqPQg35OGUhAxu9Q=
+    bucket: docksal-aws-templates
+    skip_cleanup: true
+    acl: public_read
+    local_dir: build
+    upload-dir: sandbox-server/stable
+    on:
+      repo: docksal/sandbox-server
+      branch: master
