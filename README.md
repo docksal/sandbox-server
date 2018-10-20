@@ -2,5 +2,5 @@
 
 Follow the instructions for supported cloud providers:
 
-- [Amazon Web Service](./aws-cloudformation)
+- [Amazon Web Services](./aws-cloudformation)
 - [Google Cloud Platform](./gcp-deployment-manager)
