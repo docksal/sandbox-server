@@ -21,6 +21,8 @@ PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
 # Create build-agent user with no-password sudo access
+# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
+# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
 if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
 	adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
 	usermod -aG sudo ${BUILD_USER}
@@ -33,7 +35,7 @@ if lsblk ${DATA_DISK} > /dev/null 2>&1; then
 
 	# Format the disk if necessary
 	if [[ $(lsblk -f ${DATA_DISK}) != *ext4* ]]; then
-	sudo mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}
+		mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}
 	fi
 
 	# Mount the data disk
@@ -47,10 +49,10 @@ if lsblk ${DATA_DISK} > /dev/null 2>&1; then
 	# Move BUILD_USER_HOME to the data disk
 	# E.g. /home/build-agent => /mnt/data/home/build-agent
 	if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
-	mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
-	mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
+		mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
+		mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
 	else
-	rm -rf ${BUILD_USER_HOME}
+		rm -rf ${BUILD_USER_HOME}
 	fi
 	ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
 
@@ -81,7 +83,7 @@ fi
 if [[ ! -f ${BUILD_USER_HOME}/.docksal/docksal.env ]]; then
 	mkdir -p ${BUILD_USER_HOME}/.docksal
 	tee ${BUILD_USER_HOME}/.docksal/docksal.env <<EOF
-CI=1
+CI=true
 PROJECT_INACTIVITY_TIMEOUT="${PROJECT_INACTIVITY_TIMEOUT}"
 PROJECT_DANGLING_TIMEOUT="${PROJECT_DANGLING_TIMEOUT}"
 PROJECTS_ROOT="${PROJECTS_ROOT}"
@@ -99,8 +101,7 @@ chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
 sed -i '/DOCKSAL_LOCK_UPDATES/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
 
 # Install/update Docksal and dependencies
-
-sudo -u ${BUILD_USER} sh -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOCKSAL_VERSION} bash"
+su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOCKSAL_VERSION} bash"
 
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"

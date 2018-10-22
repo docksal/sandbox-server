@@ -20,12 +20,13 @@ PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
-# Create build-agent user with no-password sudo access (google-sudoers group)
+# Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
 if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
 	adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
-	usermod -aG google-sudoers ${BUILD_USER}
+	usermod -aG sudo ${BUILD_USER}
+	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
 
 # Mount the persistent data disk if it was attached
@@ -34,7 +35,7 @@ if lsblk ${DATA_DISK} > /dev/null 2>&1; then
 
 	# Format the disk if necessary
 	if [[ $(lsblk -f ${DATA_DISK}) != *ext4* ]]; then
-		sudo mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}
+		mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}
 	fi
 
 	# Mount the data disk
@@ -46,7 +47,7 @@ if lsblk ${DATA_DISK} > /dev/null 2>&1; then
 	mount -a
 
 	# Move BUILD_USER_HOME to the data disk
-	# E.g. /home/ubuntu => /mnt/data/home/ubuntu
+	# E.g. /home/build-agent => /mnt/data/home/build-agent
 	if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
 		mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
 		mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
@@ -68,12 +69,12 @@ mkdir -p ${PROJECTS_ROOT}
 # SSH settings: disable the host key check
 if [[ ! -f "${BUILD_USER_HOME}/.ssh/config" ]]; then
 	mkdir -p ${BUILD_USER_HOME}/.ssh
-	cat <<-EOF | tee "${BUILD_USER_HOME}/.ssh/config"
-		Host *
-		  StrictHostKeyChecking no
-		  UserKnownHostsFile=/dev/null
-		  LogLevel ERROR
-	EOF
+	tee "${BUILD_USER_HOME}/.ssh/config" <<EOF
+Host *
+  StrictHostKeyChecking no
+  UserKnownHostsFile=/dev/null
+  LogLevel ERROR
+EOF
 	chmod 600 "${BUILD_USER_HOME}/.ssh/config"
 fi
 
@@ -81,12 +82,12 @@ fi
 # Note: do nothing if docksal.env exists from a previos installation (persistent data disk)
 if [[ ! -f ${BUILD_USER_HOME}/.docksal/docksal.env ]]; then
 	mkdir -p ${BUILD_USER_HOME}/.docksal
-	cat <<-EOF | tee ${BUILD_USER_HOME}/.docksal/docksal.env
-		CI=1
-		PROJECT_INACTIVITY_TIMEOUT="${PROJECT_INACTIVITY_TIMEOUT}"
-		PROJECT_DANGLING_TIMEOUT="${PROJECT_DANGLING_TIMEOUT}"
-		PROJECTS_ROOT="${PROJECTS_ROOT}"
-	EOF
+	tee ${BUILD_USER_HOME}/.docksal/docksal.env <<EOF
+CI=true
+PROJECT_INACTIVITY_TIMEOUT="${PROJECT_INACTIVITY_TIMEOUT}"
+PROJECT_DANGLING_TIMEOUT="${PROJECT_DANGLING_TIMEOUT}"
+PROJECTS_ROOT="${PROJECTS_ROOT}"
+EOF
 	# Fix permissions
 	#chown ${BUILD_USER}:${BUILD_USER} ${BUILD_USER_HOME}/.docksal/docksal.env
 fi
