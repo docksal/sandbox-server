@@ -104,16 +104,3 @@ su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOC
 
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
-
-## This has to be done under the ubuntu user to load Docker Hub credentials
-#su - ubuntu -c 'docker run --rm -v /home/ubuntu:/data ffwagency/us-east-ci'
-#chown -R ubuntu:ubuntu /home/ubuntu/  # Trailing slash is important (when using a symlink)
-#chmod 600 /home/ubuntu/.ssh/id_rsa
-#rm -rf /home/ubuntu/.git
-
-## Reset Docksal system services to apply settings
-# su - ${BUILD_USER} -c "fin system reset"
-
-# Install Git LFS client
-# curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-# apt-get -y install git-lfs </dev/null

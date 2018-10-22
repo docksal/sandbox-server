@@ -20,9 +20,7 @@ PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
-# Create build-agent user with no-password sudo access (google-sudoers group)
-# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
-# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
+# Create build-agent user with no-password sudo access
 if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
     adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
     usermod -aG sudo ${BUILD_USER}
@@ -47,7 +45,7 @@ if lsblk ${DATA_DISK} > /dev/null 2>&1; then
     mount -a
 
     # Move BUILD_USER_HOME to the data disk
-    # E.g. /home/ubuntu => /mnt/data/home/ubuntu
+    # E.g. /home/build-agent => /mnt/data/home/build-agent
     if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
     mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
     mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
@@ -106,16 +104,3 @@ sudo -u ${BUILD_USER} sh -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION
 
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
-
-## This has to be done under the ubuntu user to load Docker Hub credentials
-#su - ubuntu -c 'docker run --rm -v /home/ubuntu:/data ffwagency/us-east-ci'
-#chown -R ubuntu:ubuntu /home/ubuntu/  # Trailing slash is important (when using a symlink)
-#chmod 600 /home/ubuntu/.ssh/id_rsa
-#rm -rf /home/ubuntu/.git
-
-## Reset Docksal system services to apply settings
-# su - ${BUILD_USER} -c "fin system reset"
-
-# Install Git LFS client
-# curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash
-# apt-get -y install git-lfs </dev/null
