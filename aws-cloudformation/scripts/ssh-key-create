@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# This script generate an SSH key pair for use with AWS.
+# Generated keys will be stored in the ~/.ssh directory.
+# Alternatively, existing SSH keys can be added in the AWS EC2 panel.
+#
+
+[[ "${1}" != "" ]] && { keyname=${1}; } || { echo "Usage: ${0} keyname"; exit; }
+
+mkdir -p .ssh
+
+if [[ ! -f .ssh/${keyname} ]]; then
+	ssh-keygen -t ecdsa -q -N "" -f ~/.ssh/${keyname} -C build-agent@${keyname}
+fi

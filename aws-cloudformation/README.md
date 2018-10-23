@@ -35,7 +35,7 @@ Step-by-step manual setup instructions using aws cli and provisioning scripts.
 
 1. [Create Access Keys for Your AWS Account Root User](https://docs.aws.amazon.com/general/latest/gr/managing-aws-access-keys.html). Keep these keys in a safe place!
 
-1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair). You can skip this step and use `create-ssh-keys/import-ssh-keys` scripts from this repo.
+1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair). Or you can use the `ssh-key-create/ssh-key-import` scripts in this repo.
 
 1. Install on you local PC aws cli tool (for ubuntu run `sudo apt install awscli`)
 
@@ -55,8 +55,8 @@ Navigate to the `aws-cloudformation` folder:
 
 Execute:
 
-    ./scripts/create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
-    ./scripts/import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
+    ./scripts/ssh-key-create <keyname> - this will create new SSH key pair in your ~/.ssh directory
+    ./scripts/ssh-key-import <keyname> - this will import a local SSH key pair to all AWS EC2 regions
 
 ### Deploy the sandbox server
 
@@ -84,7 +84,7 @@ In the output of the command you'll find the server public IP address:
 
 SSH into the server and switch to the `build-agent` user:
 
-    ssh ubuntu@<external-ip> -i .ssh/<keyname>.key
+    ssh ubuntu@<external-ip> -i .ssh/<keyname>
     sudo su - build-agent
 
 Docksal is installed under the `build-agent` user account on the server. Sandbox builds MUST run as this user.

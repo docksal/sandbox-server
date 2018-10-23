@@ -87,7 +87,7 @@ To give `ci-agent` access to the sandbox server over SSH, you'll need a SSH key 
 
 Generate one like this:
 
-    ssh-keygen -t ecdsa -f ~/.ssh/docksal-sandbox -C build-agent@docksal-sandbox
+    ssh-keygen -t ecdsa -q -N "" -f ~/.ssh/docksal-sandbox -C build-agent@docksal-sandbox
 
 ### Configure public SSH key in your GCP project
 
