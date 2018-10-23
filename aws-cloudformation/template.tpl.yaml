@@ -76,8 +76,8 @@ Parameters:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
     ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
-  PersistentDiskSize:
-    Description: "Persistent volume size (GiB)"
+  DataDiskSize:
+    Description: "Persistent volume size (GiB). Valid range: 20-1024"
     Type: Number
     MinValue: 20
     MaxValue: 1024
@@ -86,29 +86,43 @@ Parameters:
     Description: "Use an existing Elastic IP for the instance"
     Type: String
     Default: ""
+  ExistingDataVolume:
+    Description: "Use an existing EBS volume for instance persistent storage. If set, must also set the instance availability zone to match the one of the EBS volume."
+    Type: String
+    Default: ""
+  ManualAZ:
+    Description: "Manually set instance availability zone (e.g. us-east-2a)"
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: "Required"
+          default: "Basic: Required"
         Parameters:
           - InstanceType
           - KeyName
       - Label:
-          default: "Optional"
+          default: "Advanced: Optional"
         Parameters:
-          - PersistentDiskSize
+          - DataDiskSize
           - ExistingEIP
+          - ExistingDataVolume
+          - ManualAZ
     ParameterLabels:
       InstanceType:
         default: "Instance type"
       KeyName:
         default: "SSH key"
-      PersistentDiskSize:
+      DataDiskSize:
         default: "Data disk size"
       ExistingEIP:
         default: "Elastic IP"
+      ExistingDataVolume:
+        default: "Persistent data volume"
+      ManualAZ:
+        default: "Availability zone"
 
 Mappings:
   Region2AMI:
@@ -144,7 +158,9 @@ Mappings:
       AMI: ami-0bbe6b35405ecebdb
 
 Conditions:
+  SetAZ: !Not [!Equals [!Ref ManualAZ, ""]]
   CreateEIP: !Equals [!Ref ExistingEIP, ""]
+  CreateDataVolume: !Equals [!Ref ExistingDataVolume, ""]
 
 Resources:
   InstanceSecurityGroup:
@@ -172,28 +188,39 @@ Resources:
     Properties:
       InstanceId: !Ref EC2Instance
       EIP: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
+  PersistentVolume:
+    Type: "AWS::EC2::Volume"
+    Condition: CreateDataVolume
+    Properties:
+      Size: !Ref DataDiskSize
+      AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone
+  PersistentVolumeMount:
+    Type: "AWS::EC2::VolumeAttachment"
+    Properties:
+      InstanceId: !Ref EC2Instance
+      VolumeId: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
+      Device: /dev/sdp
   EC2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref InstanceType
-      ImageId: !FindInMap
-        - Region2AMI
-        - !Ref 'AWS::Region'
-        - AMI
+      AvailabilityZone: !If [SetAZ, !Ref ManualAZ, !Ref "AWS::NoValue"]
+      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      EbsOptimized: true
       KeyName: !Ref KeyName
       SecurityGroups:
         - !Ref InstanceSecurityGroup
       BlockDeviceMappings:
+        # Root volume
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: '8'
-        - DeviceName: /dev/sdp
-          Ebs:
-            VolumeSize: !Ref PersistentDiskSize
       UserData: !Base64
         'Fn::Join':
           - ''
           - - |
+
+
 Outputs:
   InstanceID:
     Value: !Ref EC2Instance
