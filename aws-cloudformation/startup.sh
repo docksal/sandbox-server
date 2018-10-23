@@ -66,9 +66,18 @@ fi
 # Create the projects/builds directory
 mkdir -p ${PROJECTS_ROOT}
 
+# SSH settings: ensure ~/.ssh exists for the build user
+mkdir -p ${BUILD_USER_HOME}/.ssh
+
+# SSH settings: authorized_keys
+# If ~/.ssh/authorized_keys does not exist for the build user, reuse the one from the default user account (ubuntu)
+if [[ ! -f "${BUILD_USER_HOME}/.ssh/authorized_keys" ]]; then
+	cp "/home/ubuntu/.ssh/authorized_keys" "${BUILD_USER_HOME}/.ssh/authorized_keys"
+	chown ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/.ssh/authorized_keys"
+fi
+
 # SSH settings: disable the host key check
 if [[ ! -f "${BUILD_USER_HOME}/.ssh/config" ]]; then
-	mkdir -p ${BUILD_USER_HOME}/.ssh
 	tee "${BUILD_USER_HOME}/.ssh/config" <<EOF
 Host *
   StrictHostKeyChecking no
