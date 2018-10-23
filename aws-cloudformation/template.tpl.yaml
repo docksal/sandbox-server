@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Sandbox server template
+
 Parameters:
   InstanceType:
     Description: EC2 instance type
@@ -79,6 +80,11 @@ Parameters:
     MinValue: 20
     MaxValue: 1024
     Default: 100
+  ExistingEIP:
+    Description: Use an existing Elastic IP for the instance (optional)
+    Type: String
+    Default: ""
+
 Mappings:
   Region2AMI:
     ap-south-1:
@@ -111,6 +117,10 @@ Mappings:
       AMI: ami-063aa838bd7631e0b
     us-west-2:
       AMI: ami-0bbe6b35405ecebdb
+
+Conditions:
+  CreateEIP: !Equals [!Ref ExistingEIP, ""]
+
 Resources:
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -131,11 +141,12 @@ Resources:
           CidrIp: 0.0.0.0/0
   IPAddress:
     Type: 'AWS::EC2::EIP'
+    Condition: CreateEIP
   IPAssoc:
     Type: 'AWS::EC2::EIPAssociation'
     Properties:
       InstanceId: !Ref EC2Instance
-      EIP: !Ref IPAddress
+      EIP: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
   EC2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
@@ -162,6 +173,6 @@ Outputs:
   InstanceID:
     Value: !Ref EC2Instance
   InstanceIPAddress:
-    Value: !Ref IPAddress
+    Value: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !Ref IPAddress, '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP], '.nip.io' ] ]
