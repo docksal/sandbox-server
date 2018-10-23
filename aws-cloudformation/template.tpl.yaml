@@ -71,33 +71,31 @@ Parameters:
       - cr1.8xlarge
       - cc2.8xlarge
       - cg1.4xlarge
-    ConstraintDescription: must be a valid EC2 instance type.
+    ConstraintDescription: "Must be a valid EC2 instance type"
   KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
-    Type: 'AWS::EC2::KeyPair::KeyName'
-    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
   PersistentDiskSize:
-    Description: Persistent volume size (GiB)
+    Description: "Persistent volume size (GiB)"
     Type: Number
     MinValue: 20
     MaxValue: 1024
     Default: 100
   ExistingEIP:
-    Description: Use an existing Elastic IP for the instance (optional)
+    Description: "Use an existing Elastic IP for the instance"
     Type: String
     Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
-      -
-        Label:
+      - Label:
           default: "Required"
         Parameters:
           - InstanceType
           - KeyName
-      -
-        Label:
+      - Label:
           default: "Optional"
         Parameters:
           - PersistentDiskSize
@@ -178,7 +176,7 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref InstanceType
-      ImageId: !FindInMap 
+      ImageId: !FindInMap
         - Region2AMI
         - !Ref 'AWS::Region'
         - AMI
