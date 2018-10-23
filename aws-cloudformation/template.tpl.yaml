@@ -224,7 +224,7 @@ Resources:
 Outputs:
   InstanceID:
     Value: !Ref EC2Instance
-  InstanceIPAddress:
-    Value: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
+  InstancePublicIP:
+    Value: !GetAtt EC2Instance.PublicIp
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP], '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !GetAtt EC2Instance.PublicIp, '.nip.io' ] ]
