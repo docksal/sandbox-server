@@ -110,9 +110,6 @@ Set the following variables in the project build settings in your CI:
 
     **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
 
-- `DOCKSAL_HOST_USER` - `build-agent`
-- `REMOTE_BUILD_BASE` - `/home/build-agent/builds`
-
 For more information on `ci-agent` configuration see https://github.com/docksal/ci-agent
 
 ## Configure CI build settings
