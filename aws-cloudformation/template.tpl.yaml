@@ -3,9 +3,11 @@ Description: Sandbox server template
 
 Parameters:
   InstanceType:
-    Description: EC2 instance type
+    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
     Type: String
-    Default: t2.micro
+    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
+    # t3.small: 2 vCPU, 2GB RAM
+    Default: t3.small
     AllowedValues:
       - t1.micro
       - t2.nano
