@@ -85,6 +85,31 @@ Parameters:
     Type: String
     Default: ""
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Required"
+        Parameters:
+          - InstanceType
+          - KeyName
+      -
+        Label:
+          default: "Optional"
+        Parameters:
+          - PersistentDiskSize
+          - ExistingEIP
+    ParameterLabels:
+      InstanceType:
+        default: "Instance type"
+      KeyName:
+        default: "SSH key"
+      PersistentDiskSize:
+        default: "Data disk size"
+      ExistingEIP:
+        default: "Elastic IP"
+
 Mappings:
   Region2AMI:
     ap-south-1:
