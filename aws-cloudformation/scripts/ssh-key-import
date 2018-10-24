@@ -11,5 +11,5 @@ AWS_REGION=$(aws ec2 describe-regions --output text | awk '{print $3}' | xargs)
 
 for region in ${AWS_REGION}
 do
-	aws ec2 import-key-pair --key-name ${1} --public-key-material file://.ssh/${1}.pub --region ${region}
+	aws ec2 import-key-pair --key-name ${1} --public-key-material file://$HOME/.ssh/${1}.pub --region ${region}
 done
