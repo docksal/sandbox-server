@@ -30,6 +30,29 @@ For an overview of Deployment Manager, see https://cloud.google.com/deployment-m
     gcloud config set project <project-id>
     ```
 
+## Set up SSH keys in the GCP project
+
+Generate a new SSH key pair:
+
+    ssh-keygen -t ecdsa -q -N "" -f ~/.ssh/<keyname> -C build-agent@docksal-sandbox
+
+Replace `<keyname>` with something meaningful to identify the key, e.g. `docksal-sandbox-server`.
+
+**Note**: The `-C build-agent@docksal-sandbox` part is important.
+
+GCP uses the comment in the key to map the key to a Linux user. It will update the `build-agent` user's 
+`~/.ssh/authorized_keys` automatically, when you follow the steps below.
+
+View and copy the public key:
+
+    cat ~/.ssh/<keyname>.pub
+
+   **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
+
+Use the copied string to set a [project-wide](https://cloud.google.com/compute/docs/instances/adding-removing-ssh-keys#project-wide) public SSH key on GCP.
+
+You can now proceed to [Access the sandbox server](/#server-access)
+
 ## Deploy the sandbox server
 
 Navigate to the `gcp-deployment-manager` folder:
@@ -47,74 +70,6 @@ In the output of the command you'll find the server public IP address:
 
 There is a startup script that will do server provisioning. It will take 2-5 minutes from this point.
 
-## Access the sandbox server
-
-SSH into the server and switch to the `build-agent` user:
-
-    gcloud compute ssh docksal-sandbox-server-vm
-    sudo su - build-agent
-
-Docksal is installed under the `build-agent` user account on the server. Sandbox builds MUST run as this user.
-
-Sandbox builds path: `/home/build-agent/builds`
-
-Sandbox build URLs:
-
-    http://<sandbox-vhost>.<external-ip>.nip.io
-    https://<sandbox-vhost>.<external-ip>.nip.io
-
-## Launch a sample sandbox
-
-As the `build-agent` user on the server:
-
-    cd ~/builds
-    fin project create
-
-Follow the project wizard instructions.
-
-You will get an "internal" URL for the sandbox in the end. Add the `<external-ip>.nip.io` prefix to it to access it 
-externally, e.g.:
-
-    http://myproject.docksal => http://myproject.docksal.<external-ip>.nip.io
-
-## Set up the CI connection
-
-The sandbox server is controlled over SSH by a `ci-agent` (`docksal/ci-agent`) container, which runs your CI builds.
-
-    CI => docksal/ci-agent container => SSH => Docksal Sandbox Server
-
-To give `ci-agent` access to the sandbox server over SSH, you'll need a SSH key pair.
-
-Generate one like this:
-
-    ssh-keygen -t ecdsa -q -N "" -f ~/.ssh/docksal-sandbox -C build-agent@docksal-sandbox
-
-### Configure public SSH key in your GCP project
-
-View and copy the public key:
-
-```
-cat ~/.ssh/docksal-sandbox.pub
-```
-
-   **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
-
-Use the copied string to set a [project-wide](https://cloud.google.com/compute/docs/instances/adding-removing-ssh-keys#project-wide) public SSH key on GCP.
-
-### Configure CI project settings
-
-Set the following variables in the project build settings in your CI:
-
-- `DOCKSAL_HOST_IP` - the external IP of the sandbox server obtained in the previous steps (`<external-ip>`).
-- `DOCKSAL_HOST_SSH_KEY` - copy it from the output of `cat ~/.ssh/docksal-sandbox | base64`
-
-    **Note**: they key is a single line. If using Cloud Shell, it may break it into multiple lines. If that is the case, you will have yo manually fix the string to be one line.
-
-For more information on `ci-agent` configuration see https://github.com/docksal/ci-agent
-
-## Configure CI build settings
-
-See [Project configuration](https://github.com/docksal/ci-agent#project-configuration) docs.
 
 ## Delete the sandbox server
 
