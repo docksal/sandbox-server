@@ -51,8 +51,6 @@ View and copy the public key:
 
 Use the copied string to set a [project-wide](https://cloud.google.com/compute/docs/instances/adding-removing-ssh-keys#project-wide) public SSH key on GCP.
 
-You can now proceed to [Access the sandbox server](/#server-access)
-
 ## Deploy the sandbox server
 
 Navigate to the `gcp-deployment-manager` folder:
@@ -70,6 +68,7 @@ In the output of the command you'll find the server public IP address:
 
 There is a startup script that will do server provisioning. It will take 2-5 minutes from this point.
 
+You can now proceed to [Access the sandbox server](/README.md#server-access)
 
 ## Delete the sandbox server
 

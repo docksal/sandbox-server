@@ -26,7 +26,7 @@ Once provisioned, the IP address of the server will be printed in the **Outputs*
 
 Note: You will need the key you selected to access the sandbox server in further steps (`<ssh-private-key>`).
 
-You can now proceed to [Access the sandbox server](/#server-access) 
+You can now proceed to [Access the sandbox server](/README.md#server-access) 
 
 Note: For manual setup steps (using console tools), see [Manual setup](#manual)
 
@@ -91,7 +91,7 @@ In the output of the command you'll find the server public IP address:
 
     InstanceIPAddress <external-ip>
 
-You can now proceed to [Access the sandbox server](/#server-access)
+You can now proceed to [Access the sandbox server](/README.md#server-access)
 
 ### Delete the sandbox server
 
