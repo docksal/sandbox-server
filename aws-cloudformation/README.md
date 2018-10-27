@@ -9,7 +9,7 @@ DB instances), and AWS CloudFormation takes care of provisioning and configuring
 don't need to individually create and configure AWS resources and figure out what's dependent on what;
 AWS CloudFormation handles all of that. 
 
-For an overview of AWS CloudFormation, see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.
+For an overview of AWS CloudFormation, see the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.)
 
 ## Quick setup (using CloudFormation web UI)
 
@@ -22,32 +22,43 @@ You will be prompted for:
 - Instance type
 - SSH key name
 
-Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation. 
+Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation (`<external-ip>`). 
+
+Note: You will need the key you selected to access the sandbox server in further steps (`<ssh-private-key>`).
+
+You can now proceed to [Access the sandbox server](/README.md#server-access) 
+
+Note: For manual setup steps (using console tools), see [Manual setup](#manual)
 
 
-## Manual setup (using console tools)  
+<a name="manual"></a>
+## Manual setup (using console tools)
 
 Step-by-step manual setup instructions using aws cli and provisioning scripts. 
 
-### Initial setup on AWS CloudFormation
+### Initial setup on AWS
 
 1. Log in or create a new AWS account.
 
 1. [Create Access Keys for Your AWS Account Root User](https://docs.aws.amazon.com/general/latest/gr/managing-aws-access-keys.html). Keep these keys in a safe place!
 
-1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair). You can skip this step and use `create-ssh-keys/import-ssh-keys` scripts from this repo.
+1. [Create SSH key pair or import existing key pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair).
+ 
+    **Note**: You can also use the `ssh-key-create` / `ssh-key-import` scripts in this repo (see instructions below).
 
-1. Install on you local PC aws cli tool (for ubuntu run `sudo apt install awscli`)
+1. Install `aws` cli tool locally (for Ubuntu run `sudo apt install awscli`)
 
 1. Clone this repo
 
-1. Configure `aws` tool to use your account.
+1. Configure `aws` cli tool to use your account
 
     ```
     aws configure
     ```
 
-### Creating SSH key pair and import to AWS EC2
+### Create SSH key pair and import the key to AWS EC2
+
+**Note**: Skip this step, if you already have an existing SSH key pair or created one earlier in this process.
 
 Navigate to the `aws-cloudformation` folder:
 
@@ -55,8 +66,8 @@ Navigate to the `aws-cloudformation` folder:
 
 Execute:
 
-    ./scripts/create-ssh-keys <keyname> - this will create new ssh key pair in .ssh folder
-    ./scripts/import-ssh-keys <keyname> - this will import generated key pair to all aws ec2 regions
+    ./scripts/ssh-key-create <keyname> - this will create new SSH key pair in your ~/.ssh directory
+    ./scripts/ssh-key-import <keyname> - this will import a local SSH key pair to all AWS EC2 regions
 
 ### Deploy the sandbox server
 
@@ -69,8 +80,8 @@ Create template ready for deploy:
     ./scripts/bash2yaml startup.sh - will create template file template.yaml with startup.sh merged in it
     ./scripts/bash2json startup.sh - will create template file template.json with startup.sh merged in it
 
-By default create-stack script use template.yaml. If you want using template in json format you can edit
-create-stack script and change the value of the `template_file` variable to the preferred template format.
+By default create-stack script uses `template.yaml`. If you want using template in json format you can edit
+`create-stack` script and change the value of the `template_file` variable to the preferred template format.
 
 Launch the deployment:
 
@@ -80,14 +91,7 @@ In the output of the command you'll find the server public IP address:
 
     InstanceIPAddress <external-ip>
 
-### Access the sandbox server
-
-SSH into the server and switch to the `build-agent` user:
-
-    ssh ubuntu@<external-ip> -i .ssh/<keyname>.key
-    sudo su - build-agent
-
-Docksal is installed under the `build-agent` user account on the server. Sandbox builds MUST run as this user.
+You can now proceed to [Access the sandbox server](/README.md#server-access)
 
 ### Delete the sandbox server
 
