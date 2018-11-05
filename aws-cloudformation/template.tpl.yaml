@@ -176,7 +176,6 @@ Resources:
       InstanceType: !Ref InstanceType
       AvailabilityZone: !If [SetAZ, !Ref ManualAZ, !Ref "AWS::NoValue"]
       ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
-      EbsOptimized: true
       KeyName: !Ref KeyName
       SecurityGroups:
         - !Ref InstanceSecurityGroup
