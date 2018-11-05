@@ -29,8 +29,18 @@ if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
 	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
 
+# Wait for data volume attachment (necessary with AWS EBS)
+wait_count=0
+wait_max_attempts=12
+while ! lsblk ${DATA_DISK} &>/dev/null; do
+	let "wait_count+=1"
+	(( ${wait_count} > ${wait_max_attempts} )) && break
+	echo "Waiting for EBS volume to attach (${wait_count})..."
+	sleep 5
+done
+
 # Mount the persistent data disk if it was attached
-if lsblk ${DATA_DISK} > /dev/null 2>&1; then
+if lsblk ${DATA_DISK} &>/dev/null; then
 	echo "Using persistent disk: ${DATA_DISK} for data storage: ${MOUNT_POINT}"
 
 	# Format the disk if necessary
