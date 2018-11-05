@@ -10,7 +10,7 @@ set -e  # Fail on errors
 
 # Persistent disk settings
 DATA_DISK="/dev/xvdp"
-MOUNT_POINT="/mnt/data"
+MOUNT_POINT="/data"
 BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
 BUILD_USER_HOME="/home/${BUILD_USER}"
