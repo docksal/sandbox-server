@@ -164,12 +164,14 @@ Resources:
     Properties:
       Size: !Ref DataDiskSize
       AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone
+
   PersistentVolumeMount:
     Type: "AWS::EC2::VolumeAttachment"
     Properties:
       InstanceId: !Ref EC2Instance
       VolumeId: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
       Device: /dev/sdp
+
   EC2Instance:
     Type: 'AWS::EC2::Instance'
     Properties:
