@@ -84,6 +84,7 @@ do
 	fi
 	echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
 	mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${NAME} -L data-volume
+	mount_disk "$NAME"
 	skip=1
     done
     [ "$skip" == 1 ] && continue
