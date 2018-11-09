@@ -9,7 +9,7 @@ set -x  # Print commands
 set -e  # Fail on errors
 
 # Persistent disk settings
-DATA_DISK="/dev/xvdz"
+DISK_LABEL="data-volume"
 MOUNT_POINT="/data"
 BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
@@ -20,17 +20,42 @@ PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
-mount_disk()
+mount_part()
 {
     DATA_DISK=$1
-    tune2fs -L data-volume ${DATA_DISK}
+    # mark disk with label
+    tune2fs -L ${DISK_LABEL} ${DATA_DISK} >/dev/null 2>&1
     # Mount the data disk
     mkdir -p ${MOUNT_POINT}
     cp /etc/fstab /etc/fstab.backup
     # Write disk mount to /etc/fstab (so that it persists on reboots)
     # Equivalent of `mount /dev/sdb /mnt/data`
-    echo "LABEL=data-volume  ${MOUNT_POINT}  ext4  defaults,nofail  0 2" | tee -a /etc/fstab
+    echo "LABEL=${DISK_LABEL} ${MOUNT_POINT}  ext4  defaults,nofail  0 2" | tee -a /etc/fstab
     mount -a
+}
+
+create_fs()
+{
+    # creating ext4 fs and add label
+    DATA_DISK=$1
+    mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK} -L ${DISK_LABEL} >/dev/null 2>&1
+}
+
+get_part_list()
+{
+    # get disk partitions info.
+    # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
+    # in our case will be only one string
+    DATA_DISK=$1
+    lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} | grep part | sed 's/ /;/g'
+}
+
+create_part()
+{
+    # create msdos partition table and create primary partition used 100% disk size
+    DATA_DISK=$1
+    /sbin/parted ${DATA_DISK} -s mklabel msdos
+    /sbin/parted ${DATA_DISK} -s -a optimal mkpart primary 0% 100%
 }
 
 # Create build-agent user with no-password sudo access
@@ -48,51 +73,27 @@ wait_max_attempts=12
 while true
 do
     let "wait_count+=1"
+    # additional data disk is considered attached when number of disk attached to instance more than 1
     [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
     (( ${wait_count} > ${wait_max_attempts} )) && break
     echo "Waiting for EBS volume to attach (${wait_count})..."
     sleep 5
 done
 
-disks=$(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
-
-for disk in $disks
+# find additional data disk, format it and mount
+for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
 do
-    config=$(lsblk -p -n -d -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT $disk | sed 's/ /;/g')
-    eval $(echo $config)
-
-    [ "$MOUNTPOINT" != "" ] && { echo "Disk $NAME already mounted! Skipping..."; continue; }
-    if [ "$FSTYPE" == "ext4" ]
-    then
-	echo "Disk $NAME have FS, but not mounted! Mounting..."
-	mount_disk "$NAME"
-	continue
-    fi
-
-    skip=0
-    partitions=$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT $disk | grep part | sed 's/ /;/g')
-    for partition in $partitions
-    do
-	eval $(echo $partition)
-        [ "$MOUNTPOINT" != "" ] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; skip=1; continue; }
-	if [ "$FSTYPE" == "ext4" ]
-	then
-    	    echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."
-    	    mount_disk "$NAME"
-    	    skip=1
-    	    continue
-	fi
-	echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
-	mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${NAME} -L data-volume
-	mount_disk "$NAME"
-	skip=1
-    done
-    [ "$skip" == 1 ] && continue
-    echo "Disk $disk does not have partitions and FS"
-    echo 'start=2048, type=83' | sfdisk $disk >/dev/null 2>&1
-    eval $(lsblk -p -n -P -o NAME,TYPE $disk | grep part | cut -d' ' -f1)
-    mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${NAME} -L data-volume
-    mount_disk "${NAME}"
+    # partitioning disk if disk is clean
+    [[ $(get_part_list "${disk}") == "" ]] && { echo "Disk ${disk} is clean! Creating partition..."; create_part "${disk}"; }
+    eval $(echo $(get_part_list "${disk}"))
+    # skip disk if his partition is mounted
+    [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
+    # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
+    [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
+    # create fs and mount when we already have partition, but fs not created yet
+    echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
+    create_fs "${NAME}"
+    mount_part "${NAME}"
 done
 
 if [ -d $MOUNT_POINT ]
