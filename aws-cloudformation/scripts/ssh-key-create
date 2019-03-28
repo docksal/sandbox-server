@@ -7,8 +7,8 @@
 
 [[ "${1}" != "" ]] && { keyname=${1}; } || { echo "Usage: ${0} keyname"; exit; }
 
-mkdir -p .ssh
+mkdir -p ${HOME}/.ssh
 
-if [[ ! -f .ssh/${keyname} ]]; then
-	ssh-keygen -t ecdsa -q -N "" -f ~/.ssh/${keyname} -C build-agent@${keyname}
+if [[ ! -f ${HOME}/.ssh/${keyname} ]]; then
+	ssh-keygen -t rsa -q -N "" -f ${HOME}/.ssh/${keyname}
 fi
