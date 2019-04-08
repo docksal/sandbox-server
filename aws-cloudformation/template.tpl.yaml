@@ -9,13 +9,6 @@ Parameters:
     # t3.small: 2 vCPU, 2GB RAM
     Default: t3.small
     AllowedValues:
-      - t2.nano
-      - t2.micro
-      - t2.small
-      - t2.medium
-      - t2.large
-      - t2.xlarge
-      - t2.2xlarge
       - t3.nano
       - t3.micro
       - t3.small
@@ -23,24 +16,20 @@ Parameters:
       - t3.large
       - t3.xlarge
       - t3.2xlarge
-      - m4.large
-      - m4.xlarge
-      - m4.2xlarge
-      - m4.4xlarge
-      - m4.10xlarge
-      - m4.16xlarge
       - m5.large
       - m5.xlarge
       - m5.2xlarge
       - m5.4xlarge
-      - m5.12xlarge
-      - m5.24xlarge
       - m5d.large
       - m5d.xlarge
       - m5d.2xlarge
       - m5d.4xlarge
-      - m5d.12xlarge
-      - m5d.24xlarge
+      - r5.large
+      - r5.xlarge
+      - r5.2xlarge
+      - r5d.large
+      - r5d.xlarge
+      - r5d.2xlarge
     ConstraintDescription: "Must be a valid EC2 instance type"
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
