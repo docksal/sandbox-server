@@ -20,6 +20,9 @@ PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
+##########
+# Functions begin
+
 mount_part()
 {
     DATA_DISK=$1
@@ -47,7 +50,7 @@ get_part_list()
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
     # in our case will be only one string
     DATA_DISK=$1
-    blockdev --rereadpt ${DATA_DISK}
+    partprobe
     lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} | grep part | sed 's/ /;/g'
 }
 
@@ -59,61 +62,81 @@ create_part()
     /sbin/parted ${DATA_DISK} -s -a optimal mkpart primary 0% 100%
 }
 
+##########
+# Functions end
+
+apt-get -y update
+apt-get -y install awscli
+
+export AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/\(.*\)[a-z]/\1/')
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+STACK_ID=$(aws ec2 describe-instances --instance-id ${INSTANCE_ID} --query 'Reservations[*].Instances[*].Tags[?Key==`stack-id`].Value' --output text)
+EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
+VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`PersistentVolume`].OutputValue' --output text)
+
+# attach elastic ip
+[[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
+
+# attach volume if exist
+if [[ "${VOLUME_ID}" != "" ]]
+then
+    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp
+    # Wait for data volume attachment (necessary with AWS EBS)
+    wait_count=0
+    wait_max_attempts=12
+    while true
+    do
+        let "wait_count+=1"
+        # additional data disk is considered attached when number of disk attached to instance more than 1
+        [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
+        (( ${wait_count} > ${wait_max_attempts} )) && break
+        echo "Waiting for EBS volume to attach (${wait_count})..."
+        sleep 5
+    done
+
+    # find additional data disk, format it and mount
+    for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
+    do
+        # partitioning disk if disk is clean
+        [[ $(get_part_list "${disk}") == "" ]] && { echo "Disk ${disk} is clean! Creating partition..."; create_part "${disk}"; }
+        eval $(echo $(get_part_list "${disk}"))
+        # skip disk if his partition is mounted
+        [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
+        # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
+        [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
+        # create fs and mount when we already have partition, but fs not created yet
+        echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
+        create_fs "${NAME}"
+        mount_part "${NAME}"
+    done
+fi
+
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
 if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
-	adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
-	usermod -aG sudo ${BUILD_USER}
-	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
+    adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
+    usermod -aG sudo ${BUILD_USER}
+    echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
-
-# Wait for data volume attachment (necessary with AWS EBS)
-wait_count=0
-wait_max_attempts=12
-while true
-do
-    let "wait_count+=1"
-    # additional data disk is considered attached when number of disk attached to instance more than 1
-    [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
-    (( ${wait_count} > ${wait_max_attempts} )) && break
-    echo "Waiting for EBS volume to attach (${wait_count})..."
-    sleep 5
-done
-
-# find additional data disk, format it and mount
-for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
-do
-    # partitioning disk if disk is clean
-    [[ $(get_part_list "${disk}") == "" ]] && { echo "Disk ${disk} is clean! Creating partition..."; create_part "${disk}"; }
-    eval $(echo $(get_part_list "${disk}"))
-    # skip disk if his partition is mounted
-    [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
-    # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
-    [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
-    # create fs and mount when we already have partition, but fs not created yet
-    echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
-    create_fs "${NAME}"
-    mount_part "${NAME}"
-done
 
 if [ -d $MOUNT_POINT ]
 then
-	# Move BUILD_USER_HOME to the data disk
-	# E.g. /home/build-agent => /mnt/data/home/build-agent
-	if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
-		mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
-		mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
-	else
-		rm -rf ${BUILD_USER_HOME}
-	fi
-	ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
+    # Move BUILD_USER_HOME to the data disk
+    # E.g. /home/build-agent => /mnt/data/home/build-agent
+    if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
+        mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
+        mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
+    else
+        rm -rf ${BUILD_USER_HOME}
+    fi
+    ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
 
-	# Symlink /var/lib/docker (should not yet exist when this script runs) to the data volume
-	mkdir -p ${MOUNT_POINT}/var/lib/docker
-	ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker
+    # Symlink /var/lib/docker (should not yet exist when this script runs) to the data volume
+    mkdir -p ${MOUNT_POINT}/var/lib/docker
+    ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker
 else
-	echo "WARNING: data volume not found. Using instance-only storage"
+    echo "WARNING: data volume not found. Using instance-only storage"
 fi
 
 # Create the projects/builds directory

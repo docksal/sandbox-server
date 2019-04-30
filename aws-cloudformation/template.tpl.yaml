@@ -46,13 +46,13 @@ Parameters:
     Type: String
     Default: ""
   ExistingDataVolume:
-    Description: "Use an existing EBS volume for instance persistent storage. If set, must also set the instance availability zone to match the one of the EBS volume."
+    Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
     Type: String
     Default: ""
   ManualAZ:
-    Description: "Manually set instance availability zone (e.g. us-east-2a)"
+    Description: "Manually set instance availability zone (default: us-east-2a)"
     Type: String
-    Default: ""
+    Default: "us-east-2a"
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -62,13 +62,13 @@ Metadata:
         Parameters:
           - InstanceType
           - KeyName
+          - ManualAZ
       - Label:
           default: "Advanced: Optional"
         Parameters:
           - DataDiskSize
           - ExistingEIP
           - ExistingDataVolume
-          - ManualAZ
     ParameterLabels:
       InstanceType:
         default: "Instance type"
@@ -139,52 +139,97 @@ Resources:
           FromPort: '443'
           ToPort: '443'
           CidrIp: 0.0.0.0/0
+
   IPAddress:
     Type: 'AWS::EC2::EIP'
     Condition: CreateEIP
-  IPAssoc:
-    Type: 'AWS::EC2::EIPAssociation'
-    Properties:
-      InstanceId: !Ref EC2Instance
-      EIP: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
+
   PersistentVolume:
     Type: "AWS::EC2::Volume"
     Condition: CreateDataVolume
     Properties:
       Size: !Ref DataDiskSize
-      AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone
+      AvailabilityZone: !Ref ManualAZ
 
-  PersistentVolumeMount:
-    Type: "AWS::EC2::VolumeAttachment"
+  RootRole:
+    Type: AWS::IAM::Role
     Properties:
-      InstanceId: !Ref EC2Instance
-      VolumeId: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
-      Device: /dev/sdp
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+            - spotfleet.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole
 
-  EC2Instance:
-    Type: 'AWS::EC2::Instance'
+  RolePolicies:
+    Type: AWS::IAM::Policy
     Properties:
-      InstanceType: !Ref InstanceType
-      AvailabilityZone: !If [SetAZ, !Ref ManualAZ, !Ref "AWS::NoValue"]
-      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
-      KeyName: !Ref KeyName
-      SecurityGroups:
-        - !Ref InstanceSecurityGroup
-      BlockDeviceMappings:
-        # Root volume
-        - DeviceName: /dev/sda1
-          Ebs:
-            VolumeSize: '8'
-      UserData: !Base64
-        'Fn::Join':
-          - ''
-          - - |
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action: "*"
+          Resource: "*"
+      Roles:
+        - !Ref RootRole
 
+  RootInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref RootRole
+
+  spotInstance:
+    Type: 'AWS::EC2::SpotFleet'
+    DependsOn:
+      - RootRole
+      - InstanceSecurityGroup
+      - PersistentVolume
+    Properties:
+      SpotFleetRequestConfigData:
+        TargetCapacity: 1
+        IamFleetRole: !GetAtt RootRole.Arn
+        LaunchSpecifications:
+          - InstanceType: !Ref InstanceType
+            IamInstanceProfile:
+              Arn:
+                Fn::GetAtt:
+                  - RootInstanceProfile
+                  - Arn
+            Placement:
+              AvailabilityZone: !Ref ManualAZ
+            TagSpecifications:
+              - ResourceType: instance
+                Tags:
+                - Key: stack-id
+                  Value: !Ref AWS::StackId
+            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+            KeyName: !Ref KeyName
+            SecurityGroups:
+              - GroupId: !GetAtt InstanceSecurityGroup.GroupId
+            BlockDeviceMappings:
+            # Root volume
+              - DeviceName: /dev/sda1
+                Ebs:
+                  VolumeSize: '8'
+            UserData: !Base64
+              'Fn::Join':
+                - ''
+                - - |
 
 Outputs:
-  InstanceID:
-    Value: !Ref EC2Instance
-  InstancePublicIP:
-    Value: !GetAtt EC2Instance.PublicIp
+  IPAddress:
+    Value: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
+  PersistentVolume:
+    Value: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !GetAtt EC2Instance.PublicIp, '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP], '.nip.io' ] ]
