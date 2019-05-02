@@ -53,6 +53,18 @@ Parameters:
     Description: "Manually set instance availability zone (default: us-east-2a)"
     Type: String
     Default: "us-east-2a"
+  GITHUBTOKEN:
+    Description: "Github token with read:org access level"
+    Type: String
+    Default: ""
+  GITHUBORGNAME:
+    Description: "Github organization machine name"
+    Type: String
+    Default: ""
+  GITHUBTEAMSLUG:
+    Description: "Github team machine name. Users in this team will have access to Sandbox server"
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -69,6 +81,9 @@ Metadata:
           - DataDiskSize
           - ExistingEIP
           - ExistingDataVolume
+          - GITHUBTOKEN
+          - GITHUBORGNAME
+          - GITHUBTEAMSLUG
     ParameterLabels:
       InstanceType:
         default: "Instance type"
@@ -82,6 +97,12 @@ Metadata:
         default: "Persistent data volume"
       ManualAZ:
         default: "Availability zone"
+      GITHUBTOKEN:
+        default: "Github token"
+      GITHUBORGNAME:
+        default: "Github organization"
+      GITHUBTEAMSLUG:
+        default: "Github team"
 
 Mappings:
   Region2AMI:
@@ -151,7 +172,43 @@ Resources:
       Size: !Ref DataDiskSize
       AvailabilityZone: !Ref ManualAZ
 
-  RootRole:
+  FleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - spotfleet.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  FleetPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - "ec2:DescribeImages"
+            - "ec2:DescribeSubnets"
+            - "ec2:RequestSpotInstances"
+            - "ec2:TerminateInstances"
+            - "ec2:DescribeInstanceStatus"
+            - "iam:PassRole"
+            - "cloudformation:DescribeStacks"
+            - "ec2:DescribeInstances"
+            - "ec2:CreateTags"
+          Resource: "*"
+      Roles:
+        - !Ref FleetRole
+
+  InstanceRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -161,14 +218,11 @@ Resources:
           Principal:
             Service:
             - ec2.amazonaws.com
-            - spotfleet.amazonaws.com
           Action:
           - sts:AssumeRole
       Path: "/"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole
 
-  RolePolicies:
+  InstancePolicies:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: root
@@ -176,41 +230,45 @@ Resources:
         Version: '2012-10-17'
         Statement:
         - Effect: Allow
-          Action: "*"
+          Action:
+            - "cloudformation:DescribeStacks"
+            - "ec2:DescribeInstances"
+            - "ec2:AttachVolume"
+            - "ec2:AssociateAddress"
           Resource: "*"
       Roles:
-        - !Ref RootRole
+        - !Ref InstanceRole
 
-  RootInstanceProfile:
+  InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Path: "/"
       Roles:
-        - !Ref RootRole
+        - !Ref InstanceRole
 
   spotInstance:
     Type: 'AWS::EC2::SpotFleet'
     DependsOn:
-      - RootRole
+      - FleetRole
       - InstanceSecurityGroup
       - PersistentVolume
     Properties:
       SpotFleetRequestConfigData:
         TargetCapacity: 1
-        IamFleetRole: !GetAtt RootRole.Arn
+        IamFleetRole: !GetAtt FleetRole.Arn
         LaunchSpecifications:
           - InstanceType: !Ref InstanceType
             IamInstanceProfile:
               Arn:
                 Fn::GetAtt:
-                  - RootInstanceProfile
+                  - InstanceProfile
                   - Arn
             Placement:
               AvailabilityZone: !Ref ManualAZ
             TagSpecifications:
               - ResourceType: instance
                 Tags:
-                - Key: stack-id
+                - Key: StackId
                   Value: !Ref AWS::StackId
             ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
             KeyName: !Ref KeyName
@@ -225,11 +283,16 @@ Resources:
               'Fn::Join':
                 - ''
                 - - |
-
 Outputs:
   IPAddress:
     Value: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
   PersistentVolume:
     Value: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
+  GITHUBTOKEN:
+    Value: !Ref GITHUBTOKEN
+  GITHUBORGNAME:
+    Value: !Ref GITHUBORGNAME
+  GITHUBTEAMSLUG:
+    Value: !Ref GITHUBTEAMSLUG
   InstanceURL:
     Value: !Join [ '', [ 'https://', !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP], '.nip.io' ] ]

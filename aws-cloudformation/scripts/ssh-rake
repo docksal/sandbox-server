@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+
+# ssh-rake (SSH Remote Authorized Keys)
+#
+# Authenticates SSH users via Github keys stored in their profiles.
+# https://github.com/lmakarov/ssh-rake
+
+#set -e  # Exit on errors
+#set -x  # Echo commands
+
+SSH_RAKE_VERSION='0.1.0'
+
+# -------------------- Settings -------------------- #
+
+# The following variables can either be hardcoded here or put into the config file set via SSH_RAKE_CONFIG
+GITHUB_TOKEN=${GITHUB_TOKEN:-""}  # Token with read:org access level
+GITHUB_ORG_NAME=${GITHUB_ORG_NAME:-""}  # Github organization machine name
+GITHUB_TEAM_SLUG=${GITHUB_TEAM_SLUG:-""}  # Github team machine name
+GITHUB_TEAM_ID=${GITHUB_TEAM_ID:-""} # Github team id. Use instead of team slug to reduce API roundtrips and delays
+# !!! IMPORTANT !!!
+# Set a backup SSH public key or you may end up with no access to the server (if something goes wrong)
+BACKUP_SSH_PUBLIC_KEY="$(curl -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key)"
+
+GITHUB_API_URL=${GITHUB_API_URL:-"https://api.github.com"}
+SSH_RAKE_PATH=${SSH_RAKE_PATH:-'/usr/local/bin/ssh-rake'}
+SSHD_CONFIG_FILE=${SSHD_CONFIG_FILE:-'/etc/ssh/sshd_config'}
+SSH_RAKE_CONFIG=${SSH_RAKE_CONFIG:-'.env'}  # Used for local dev testing
+SSH_RAKE_CACHE=${SSH_RAKE_CACHE:-'/tmp/.ssh-rake.cache'}
+
+# Load configuration from file (.env in the current path unless set otherwise via SSH_RAKE_CONFIG env variable)
+# Variables defined in the config file will override those defined above
+[[ -f ${SSH_RAKE_CONFIG} ]] && source ${SSH_RAKE_CONFIG}
+
+# --------------------------------------------------- #
+
+# -------------------- Functions -------------------- #
+
+check_settings ()
+{
+	[[ "$GITHUB_TOKEN" == "" ]] && echo "GITHUB_TOKEN is not configured" && exit 1
+	[[ "$GITHUB_ORG_NAME" == "" ]] && echo "GITHUB_ORG_NAME is not configured" && exit 1
+	[[ "$GITHUB_TEAM_SLUG" == "" ]] && echo "GITHUB_TEAM_SLUG is not configured" && exit 1
+	[[ "$BACKUP_SSH_PUBLIC_KEY" == "" ]] && echo "BACKUP_SSH_PUBLIC_KEY is not configured" && exit 1
+
+	return 0
+}
+
+check_dependencies ()
+{
+	local do_install_deps
+
+	! which curl >/dev/null && do_install_deps=1
+	! which jq >/dev/null && do_install_deps=1
+
+	[[ "$do_install_deps" != "" ]] && install_dependencies || return 0
+}
+
+install_dependencies ()
+{
+	echo 'Installing missing dependencies...'
+	sudo apt-get update
+	sudo apt-get install curl jq -y
+}
+
+# Make a GET request to Github API
+gh_api_get ()
+{
+	endpoint="${1}"
+	curl -fsSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3.raw" "${GITHUB_API_URL}${endpoint}?per_page=1000"
+}
+
+# Get team id by team slug
+gh_get_team_id ()
+{
+	local orgName="$1"
+	local teamSlug="$2"
+
+	# If curl fails, return
+	response=$(gh_api_get "/orgs/${orgName}/teams") || return $?
+	echo "$response" | jq -r ".[] | select(.slug == \"${teamSlug}\") | .id"
+}
+
+# Get list of members by team id
+# /teams/:id/members
+gh_get_team_members ()
+{
+	local teamId="$1"	
+	
+	# If curl fails, return
+	response=$(gh_api_get "/teams/${teamId}/members") || return $?
+	echo "$response" | jq -r '.[].login'
+}
+
+# Get public SSH keys by username
+# /users/:username/keys
+gh_get_user_keys ()
+{
+	local userName="$1"
+	
+	# If curl fails, return
+	response=$(gh_api_get "/users/${userName}/keys") || return $?
+	echo "$response" | jq -r '.[].key'
+}
+
+# Get public SSH keys for all team members by team slug
+get_team_ssh_keys ()
+{
+	local orgName="$1"
+	local teamSlug="$2"
+	
+	# If not set, get team id from org name and team slug
+	teamId=${GITHUB_TEAM_ID:-$(gh_get_team_id "${orgName}" "${teamSlug}")}
+
+	# Get keys for all users in the team
+	teamMembers=$(gh_get_team_members "${teamId}") || return $?
+	for userName in $teamMembers; do
+		keys=$(gh_get_user_keys "${userName}")
+		# Avoid outputing empty results
+		if [[ "$keys" != "" ]]; then
+			echo '# '${userName}
+			echo "$keys"
+			echo
+		fi
+	done
+}
+
+# Writes a configuration line to ${SSHD_CONFIG_FILE}
+# Makes sure previous lines with the same key are commented out first (since only the first instance is taken into consideration)
+# Won't write the same line twice
+configure_sshd_writeln ()
+{
+	local cfgKey="${1}"
+	local cfgVal="${2}"
+
+	# Append a newline at the end of file it one does not exist
+	sed -i~ '$ a\' ${SSHD_CONFIG_FILE}
+
+	# Find line with cfgKey not matching cfgVal and comment it out
+	lineNum=$(grep -n "^${cfgKey} " ${SSHD_CONFIG_FILE} | grep -v "${cfgKey} ${cfgVal}$" | cut -d ":" -f 1)
+	# Comment out the line. Handle multiple lines (edge case) via xargs
+	echo "$lineNum" | xargs -I '{}' sed -i~ "{} s/^/#/" ${SSHD_CONFIG_FILE}
+	
+	# Now write our configuration line at the end of the file (unless it's already there)
+	grep -q "^${cfgKey} ${cfgVal}$" ${SSHD_CONFIG_FILE} \
+		|| echo "${cfgKey} ${cfgVal}" | tee -a ${SSHD_CONFIG_FILE}
+}
+
+configure_sshd ()
+{
+	local reload
+
+	echo "Configuring SSHD..."
+	while read line; do
+		read -r cfgKey cfgVal <<< "$line"
+		configure_sshd_writeln "$cfgKey" "$cfgVal"
+	## SSHD configuration
+	done <<-EOL
+		AuthorizedKeysCommand ${SSH_RAKE_PATH}
+		AuthorizedKeysCommandUser nobody
+		AuthorizedKeysFile /dev/null
+	EOL
+
+	# Reload sshd to apply changes
+	echo "Reloading SSHD..."
+	sudo /etc/init.d/ssh reload
+}
+
+print_keys ()
+{
+	# Print the list of SSH keys for all team members
+	keys=$(get_team_ssh_keys "${GITHUB_ORG_NAME}" "${GITHUB_TEAM_SLUG}")
+	if [[ $? == 0 ]]; then
+		# Store in cache file and output to stdout
+		# Even if everything was ok, keys may be empty (no team members or no keys)
+		echo "$keys" > ${SSH_RAKE_CACHE}
+		echo "# Github/${GITHUB_ORG_NAME}/${GITHUB_TEAM_SLUG}"
+		echo "$keys"
+	else
+		# If something went wrong, output from cache file (if it exists)
+		echo "# Github/${GITHUB_ORG_NAME}/${GITHUB_TEAM_SLUG} (from local cache)"
+		[[ -f ${SSH_RAKE_CACHE} ]] && cat ${SSH_RAKE_CACHE}
+	fi
+}
+
+# --------------------------------------------------- #
+
+
+# -------------------- Runtime -------------------- #
+
+# Always print the backup public key no matter what
+echo '# ' backup-key
+echo "${BACKUP_SSH_PUBLIC_KEY}"
+echo
+
+check_settings
+check_dependencies
+
+# Parse command line parameters
+case "$1" in
+	# Used for debugging and running internal functions directly
+	# Example: ssk-rake debug gh_get_team_id awesome-org ops-team
+	debug)
+		shift
+		eval "$@"
+		;;
+	install)
+		shift
+			configure_sshd
+		;;
+	*)
+		print_keys
+esac
+
+# ------------------------------------------------- #
