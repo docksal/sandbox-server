@@ -10,13 +10,17 @@ env:
     # Encrypted AWS_SECRET_ACCESS_KEY
     - secure: "KGqbZdK65Z/fwuM8XkIO7awap+hastKvpAXJPe1FvwwZ9QGK+t9ZDljyIN8oSZdEPH4te7opo5D5LxNVVbFuTfnQ4P3Mikl7aOoGQi39wx5XmBueeQB+r/fl1GjkOoRcHyLmRRbeP4Ux/VDG2cCNUsS9q/s6kqsf8k0RmcpDMn0tBef/CixdnTfoQxO8QOgDCoBt+ErBamgt/HFWM89bw4uaehXwoevgArVkaiFyyJv3xBpKRAWKYPuwxCc9iadbb13SiPbs5qx0lQulrYLzf3qkQKBBJRGAPysC7uITW10TY/KjxmHA4S6+Z67P5GK5khZ55xsC86gz0fgWHFCdflbu46kS2bkAozEf9HnU3cDV3sHMgPyIOaAgGwmYjcDjwE+oxa54sTfzEwZ1yAKY3twwDiKue/4hdaHVknoWUJdjL7s5fOS3XXl3g8pHsRvzAx9XO8ZAOv7n2Pf0UvGbgklbTgDQO+Vvi7jDJb1yXGT6o9YFTpazpj5R3kU1Nf3V28zNQ8/OGqKssKghgT/9Cm1DqZIWWiPHmbkF6Q7e/HBSgTLaRd/PI//C/pSlc25TO/vQ+hBoqdxZ/1FCDDiCpLCXxd1b33ea3HUKBtmKKtSWDYGo6VVI8X+PCx7DvzpWIX85xgLhvloTUeNUL4ly/dcVhuEDiq5eWGHdcw20NmY="
 
+  matrix:
+    - VERSION=basic
+    - VERSION=advanced
+
 install:
   - pip install awscli --upgrade
 
 script:
-  - cd aws-cloudformation && ./scripts/bash2yaml startup.sh
-  - mkdir -p build && mv -f template.yaml build
-  - aws cloudformation validate-template --region ${AWS_REGION} --template-body file://build/template.yaml
+  - cd aws-cloudformation && ./scripts/bash2yaml startup-${VERSION}.sh tpl-${VERSION}.yaml
+  - mkdir -p build && mv -f template.yaml build/${VERSION}.yaml
+  - aws cloudformation validate-template --region ${AWS_REGION} --template-body file://build/${VERSION}.yaml
 
 deploy:
   - provider: s3

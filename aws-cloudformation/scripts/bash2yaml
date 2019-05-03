@@ -3,9 +3,9 @@
 # This script converts bash scripts to yaml format and create ready to deploy template.yaml
 #
 
-[[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
+[[ "$2" == "" ]] && { echo "Usage: $0 bash_script template_file"; exit; }
 
-template_file="template.tpl.yaml"
+template_file="$2"
 
 lines_num=`grep -n "^[[:space:]]*- - |" ${template_file} | cut -d':' -f 1`
 

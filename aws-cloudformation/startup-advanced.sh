@@ -69,10 +69,13 @@ apt-get -y update
 apt-get -y install awscli
 
 export AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/\(.*\)[a-z]/\1/')
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-STACK_ID=$(aws ec2 describe-instances --instance-id ${INSTANCE_ID} --query 'Reservations[*].Instances[*].Tags[?Key==`StackId`].Value' --output text)
-EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
-VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`PersistentVolume`].OutputValue' --output text)
+export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+export STACK_ID=$(aws ec2 describe-instances --instance-id ${INSTANCE_ID} --query 'Reservations[*].Instances[*].Tags[?Key==`StackId`].Value' --output text)
+export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
+export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`PersistentVolume`].OutputValue' --output text)
+export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTOKEN`].OutputValue' --output text)
+export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBORGNAME`].OutputValue' --output text)
+export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTEAMSLUG`].OutputValue' --output text)
 
 # attach elastic ip
 [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
@@ -80,7 +83,7 @@ VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
-    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp
+    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
     # Wait for data volume attachment (necessary with AWS EBS)
     wait_count=0
     wait_max_attempts=12
@@ -191,18 +194,11 @@ su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOC
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
 
-GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTOKEN`].OutputValue' --output text)
-GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBORGNAME`].OutputValue' --output text)
-GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTEAMSLUG`].OutputValue' --output text)
+curl -s https://raw.githubusercontent.com/docksal/sandbox-server/spot/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
 
-echo "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}" >>/etc/environment
-echo "GITHUB_TOKEN=${GITHUB_TOKEN}" >>/etc/environment
-echo "GITHUB_ORG_NAME=${GITHUB_ORG_NAME}" >>/etc/environment
-echo "GITHUB_TEAM_SLUG=${GITHUB_TEAM_SLUG}" >>/etc/environment
-
-source /etc/environment
-
-curl -s https://raw.githubusercontent.com/docksal/sandbox-server/ec2/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
+sed -i 's/^GITHUB_TOKEN=""/GITHUB_TOKEN="'${GITHUB_TOKEN}'"/' /usr/local/bin/ssh-rake
+sed -i 's/^GITHUB_ORG_NAME=""/GITHUB_ORG_NAME="'${GITHUB_ORG_NAME}'"/' /usr/local/bin/ssh-rake
+sed -i 's/^GITHUB_TEAM_SLUG=""/GITHUB_TEAM_SLUG="'${GITHUB_TEAM_SLUG}'"/' /usr/local/bin/ssh-rake
 
 chmod +x /usr/local/bin/ssh-rake
 

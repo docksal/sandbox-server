@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Sandbox server template (basic)
+
+Parameters:
+  InstanceType:
+    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
+    Type: String
+    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
+    # t3.small: 2 vCPU, 2GB RAM
+    Default: t3.small
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m5d.large
+      - m5d.xlarge
+      - m5d.2xlarge
+      - m5d.4xlarge
+      - r5.large
+      - r5.xlarge
+      - r5.2xlarge
+      - r5d.large
+      - r5d.xlarge
+      - r5d.2xlarge
+    ConstraintDescription: "Must be a valid EC2 instance type"
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
+  DataDiskSize:
+    Description: "Persistent volume size (GiB). Valid range: 20-1024"
+    Type: Number
+    MinValue: 20
+    MaxValue: 1024
+    Default: 100
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Basic: Required"
+        Parameters:
+          - InstanceType
+          - KeyName
+      - Label:
+          default: "Advanced: Optional"
+        Parameters:
+          - DataDiskSize
+    ParameterLabels:
+      InstanceType:
+        default: "Instance type"
+      KeyName:
+        default: "SSH key"
+      DataDiskSize:
+        default: "Data disk size"
+
+Mappings:
+  Region2AMI:
+    ap-south-1:
+      AMI: ami-0d773a3b7bb2bb1c1
+    eu-west-3:
+      AMI: ami-08182c55a1c188dee
+    eu-west-2:
+      AMI: ami-0b0a60c0a2bd40612
+    eu-west-1:
+      AMI: ami-00035f41c82244dab
+    ap-northeast-2:
+      AMI: ami-06e7b9c5e0c4dd014
+    ap-northeast-1:
+      AMI: ami-07ad4b1c3af1ea214
+    sa-east-1:
+      AMI: ami-03c6239555bb12112
+    ca-central-1:
+      AMI: ami-0427e8367e3770df1
+    ap-southeast-1:
+      AMI: ami-0c5199d385b432989
+    ap-southeast-2:
+      AMI: ami-07a3bd4944eb120a0
+    eu-central-1:
+      AMI: ami-0bdf93799014acdc4
+    us-east-1:
+      AMI: ami-0ac019f4fcb7cb7e6
+    us-east-2:
+      AMI: ami-0f65671a86f061fcd
+    us-west-1:
+      AMI: ami-063aa838bd7631e0b
+    us-west-2:
+      AMI: ami-0bbe6b35405ecebdb
+
+Resources:
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable SSH, HTTP, HTTPS'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+
+  IPAddress:
+    Type: 'AWS::EC2::EIP'
+
+  IPAssoc:
+    Type: 'AWS::EC2::EIPAssociation'
+    Properties:
+      InstanceId: !Ref ec2Instance
+      EIP: !Ref IPAddress
+
+  PersistentVolume:
+    Type: "AWS::EC2::Volume"
+    Properties:
+      Size: !Ref DataDiskSize
+      AvailabilityZone: !GetAtt ec2Instance.AvailabilityZone
+
+  PersistentVolumeMount:
+    Type: "AWS::EC2::VolumeAttachment"
+    Properties:
+      InstanceId: !Ref ec2Instance
+      VolumeId: !Ref PersistentVolume
+      Device: /dev/sdp
+
+  ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      AvailabilityZone: !Ref "AWS::NoValue"
+      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      BlockDeviceMappings:
+        # Root volume
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: '8'
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+
+Outputs:
+  InstanceID:
+    Value: !Ref ec2Instance
+  IPAddress:
+    Value: !GetAtt ec2Instance.PublicIp
+  InstanceURL:
+    Value: !Join [ '', [ 'https://', !GetAtt ec2Instance.PublicIp, '.nip.io' ] ]

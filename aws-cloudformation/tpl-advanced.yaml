@@ -1,7 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Sandbox server template
+Description: Sandbox server template (advanced)
 
 Parameters:
+  ResourceType:
+    Description: "Resource type (default: ec2)"
+    Type: String
+    Default: ec2
+    AllowedValues:
+      - ec2
+      - spot
   InstanceType:
     Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
     Type: String
@@ -35,23 +42,16 @@ Parameters:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
     ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
-  DataDiskSize:
-    Description: "Persistent volume size (GiB). Valid range: 20-1024"
-    Type: Number
-    MinValue: 20
-    MaxValue: 1024
-    Default: 100
   ExistingEIP:
     Description: "Use an existing Elastic IP for the instance"
     Type: String
     Default: ""
   ExistingDataVolume:
     Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
-    Type: String
-    Default: ""
+    Type: "AWS::EC2::Volume::Id"
   ManualAZ:
     Description: "Manually set instance availability zone (default: us-east-2a)"
-    Type: String
+    Type: AWS::EC2::AvailabilityZone::Name
     Default: "us-east-2a"
   GITHUBTOKEN:
     Description: "Github token with read:org access level"
@@ -72,25 +72,25 @@ Metadata:
       - Label:
           default: "Basic: Required"
         Parameters:
+          - ResourceType
           - InstanceType
           - KeyName
           - ManualAZ
+          - ExistingEIP
+          - ExistingDataVolume
       - Label:
           default: "Advanced: Optional"
         Parameters:
-          - DataDiskSize
-          - ExistingEIP
-          - ExistingDataVolume
           - GITHUBTOKEN
           - GITHUBORGNAME
           - GITHUBTEAMSLUG
     ParameterLabels:
+      ResourceType:
+        default: "Resource type"
       InstanceType:
         default: "Instance type"
       KeyName:
         default: "SSH key"
-      DataDiskSize:
-        default: "Data disk size"
       ExistingEIP:
         default: "Elastic IP"
       ExistingDataVolume:
@@ -138,9 +138,8 @@ Mappings:
       AMI: ami-0bbe6b35405ecebdb
 
 Conditions:
-  SetAZ: !Not [!Equals [!Ref ManualAZ, ""]]
-  CreateEIP: !Equals [!Ref ExistingEIP, ""]
-  CreateDataVolume: !Equals [!Ref ExistingDataVolume, ""]
+  CreateEC2: !Equals [!Ref ResourceType, "ec2"]
+  CreateSpot: !Equals [!Ref ResourceType, "spot"]
 
 Resources:
   InstanceSecurityGroup:
@@ -161,19 +160,9 @@ Resources:
           ToPort: '443'
           CidrIp: 0.0.0.0/0
 
-  IPAddress:
-    Type: 'AWS::EC2::EIP'
-    Condition: CreateEIP
-
-  PersistentVolume:
-    Type: "AWS::EC2::Volume"
-    Condition: CreateDataVolume
-    Properties:
-      Size: !Ref DataDiskSize
-      AvailabilityZone: !Ref ManualAZ
-
   FleetRole:
     Type: AWS::IAM::Role
+    Condition: CreateSpot
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -188,6 +177,7 @@ Resources:
 
   FleetPolicies:
     Type: AWS::IAM::Policy
+    Condition: CreateSpot
     Properties:
       PolicyName: root
       PolicyDocument:
@@ -248,10 +238,7 @@ Resources:
 
   spotInstance:
     Type: 'AWS::EC2::SpotFleet'
-    DependsOn:
-      - FleetRole
-      - InstanceSecurityGroup
-      - PersistentVolume
+    Condition: CreateSpot
     Properties:
       SpotFleetRequestConfigData:
         TargetCapacity: 1
@@ -283,11 +270,36 @@ Resources:
               'Fn::Join':
                 - ''
                 - - |
+
+  ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Condition: CreateEC2
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      InstanceType: !Ref InstanceType
+      AvailabilityZone: !Ref ManualAZ
+      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      KeyName: !Ref KeyName
+      Tags:
+      - Key: StackId
+        Value: !Ref AWS::StackId
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      BlockDeviceMappings:
+        # Root volume
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: '8'
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+
 Outputs:
   IPAddress:
-    Value: !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP]
+    Value: !Ref ExistingEIP
   PersistentVolume:
-    Value: !If [CreateDataVolume, !Ref PersistentVolume, !Ref ExistingDataVolume]
+    Value: !Ref ExistingDataVolume
   GITHUBTOKEN:
     Value: !Ref GITHUBTOKEN
   GITHUBORGNAME:
@@ -295,4 +307,4 @@ Outputs:
   GITHUBTEAMSLUG:
     Value: !Ref GITHUBTEAMSLUG
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !If [CreateEIP, !Ref IPAddress, !Ref ExistingEIP], '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]

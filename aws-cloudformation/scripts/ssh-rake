@@ -13,10 +13,10 @@ SSH_RAKE_VERSION='0.1.0'
 # -------------------- Settings -------------------- #
 
 # The following variables can either be hardcoded here or put into the config file set via SSH_RAKE_CONFIG
-GITHUB_TOKEN=${GITHUB_TOKEN:-""}  # Token with read:org access level
-GITHUB_ORG_NAME=${GITHUB_ORG_NAME:-""}  # Github organization machine name
-GITHUB_TEAM_SLUG=${GITHUB_TEAM_SLUG:-""}  # Github team machine name
-GITHUB_TEAM_ID=${GITHUB_TEAM_ID:-""} # Github team id. Use instead of team slug to reduce API roundtrips and delays
+GITHUB_TOKEN=""  # Token with read:org access level
+GITHUB_ORG_NAME=""  # Github organization machine name
+GITHUB_TEAM_SLUG=""  # Github team machine name
+GITHUB_TEAM_ID="" # Github team id. Use instead of team slug to reduce API roundtrips and delays
 # !!! IMPORTANT !!!
 # Set a backup SSH public key or you may end up with no access to the server (if something goes wrong)
 BACKUP_SSH_PUBLIC_KEY="$(curl -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key)"
@@ -37,10 +37,10 @@ SSH_RAKE_CACHE=${SSH_RAKE_CACHE:-'/tmp/.ssh-rake.cache'}
 
 check_settings ()
 {
-	[[ "$GITHUB_TOKEN" == "" ]] && echo "GITHUB_TOKEN is not configured" && exit 1
-	[[ "$GITHUB_ORG_NAME" == "" ]] && echo "GITHUB_ORG_NAME is not configured" && exit 1
-	[[ "$GITHUB_TEAM_SLUG" == "" ]] && echo "GITHUB_TEAM_SLUG is not configured" && exit 1
-	[[ "$BACKUP_SSH_PUBLIC_KEY" == "" ]] && echo "BACKUP_SSH_PUBLIC_KEY is not configured" && exit 1
+	[[ "$GITHUB_TOKEN" == "" ]] && echo "GITHUB_TOKEN is not configured" && exit 0
+	[[ "$GITHUB_ORG_NAME" == "" ]] && echo "GITHUB_ORG_NAME is not configured" && exit 0
+	[[ "$GITHUB_TEAM_SLUG" == "" ]] && echo "GITHUB_TEAM_SLUG is not configured" && exit 0
+	[[ "$BACKUP_SSH_PUBLIC_KEY" == "" ]] && echo "BACKUP_SSH_PUBLIC_KEY is not configured" && exit 0
 
 	return 0
 }
