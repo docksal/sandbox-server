@@ -47,7 +47,7 @@ get_part_list()
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
     # in our case will be only one string
     DATA_DISK=$1
-    blockdev --rereadpt ${DATA_DISK}
+    partprobe
     lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} | grep part | sed 's/ /;/g'
 }
 
