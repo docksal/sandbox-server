@@ -83,6 +83,13 @@ export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STAC
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
+    # wait volume "available" status
+    while true
+    do
+        result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
+        [[ "${result}" != "" ]] && break
+        sleep 5
+    done
     aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
     # Wait for data volume attachment (necessary with AWS EBS)
     wait_count=0
@@ -194,12 +201,15 @@ su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOC
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
 
-curl -s https://raw.githubusercontent.com/docksal/sandbox-server/spot/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
-
-sed -i 's/^GITHUB_TOKEN=""/GITHUB_TOKEN="'${GITHUB_TOKEN}'"/' /usr/local/bin/ssh-rake
-sed -i 's/^GITHUB_ORG_NAME=""/GITHUB_ORG_NAME="'${GITHUB_ORG_NAME}'"/' /usr/local/bin/ssh-rake
-sed -i 's/^GITHUB_TEAM_SLUG=""/GITHUB_TEAM_SLUG="'${GITHUB_TEAM_SLUG}'"/' /usr/local/bin/ssh-rake
-
-chmod +x /usr/local/bin/ssh-rake
-
-[[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]] && /usr/local/bin/ssh-rake install || true
+if [[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]]
+then
+    BACKUP_SSH_PUBLIC_KEY="$(curl -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key)"
+    # TODO: move ssh-rake script to separate repo
+    curl -s https://raw.githubusercontent.com/docksal/sandbox-server/develop/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_TOKEN=\".*\"|GITHUB_TOKEN=\"${GITHUB_TOKEN}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_ORG_NAME=\".*\"|GITHUB_ORG_NAME=\"${GITHUB_ORG_NAME}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_TEAM_SLUG=\".*\"|GITHUB_TEAM_SLUG=\"${GITHUB_TEAM_SLUG}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^BACKUP_SSH_PUBLIC_KEY=\".*\"|BACKUP_SSH_PUBLIC_KEY=\"${BACKUP_SSH_PUBLIC_KEY}\"|g" /usr/local/bin/ssh-rake
+    chmod +x /usr/local/bin/ssh-rake
+    /usr/local/bin/ssh-rake install
+fi
