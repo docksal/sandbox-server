@@ -70,15 +70,21 @@ fi
 
 # Wait for data volume attachment (necessary with AWS EBS)
 wait_count=0
-wait_max_attempts=12
+wait_max_attempts=6
 while true
 do
     let "wait_count+=1"
     # additional data disk is considered attached when number of disk attached to instance more than 1
     [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
-    (( ${wait_count} > ${wait_max_attempts} )) && break
+
+	# Fail if reached maximum attempts
+	if (( ${wait_count} > ${wait_max_attempts} )); then
+		echo "ERROR: Timed out waiting for EBS volume to attach."
+		exit 1
+	fi
+
     echo "Waiting for EBS volume to attach (${wait_count})..."
-    sleep 5
+    sleep 10
 done
 
 # find additional data disk, format it and mount

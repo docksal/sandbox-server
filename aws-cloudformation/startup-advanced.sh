@@ -83,25 +83,47 @@ export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STAC
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
-    # wait volume "available" status
-    while true
-    do
-        result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
-        [[ "${result}" != "" ]] && break
-        sleep 5
-    done
-    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
-    # Wait for data volume attachment (necessary with AWS EBS)
+    # Wait for EBS volume "available" status before attaching.
+    # When updating a spot stack, the volume may be in use by the previous instance which has not yet been terminated.
     wait_count=0
-    wait_max_attempts=12
+    wait_max_attempts=30
     while true
     do
         let "wait_count+=1"
-        # additional data disk is considered attached when number of disk attached to instance more than 1
+        # Check volume status. Non-empty output means volume is available and we can proceed.
+        result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
+        [[ "${result}" != "" ]] && break
+
+        # Fail if reached maximum attempts
+        if (( ${wait_count} > ${wait_max_attempts} )); then
+            echo "ERROR: Timed out waiting for EBS volume to be available."
+            exit 1
+        fi
+
+        echo "Waiting for EBS volume to become available (${wait_count})..."
+        sleep 10
+    done
+
+    # Attache the EBS volume to the instance
+    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
+
+    # Wait for data volume attachment to complete
+    wait_count=0
+    wait_max_attempts=6
+    while true
+    do
+        let "wait_count+=1"
+        # Consider additional data disk attached when number of disk attached to instance is > 1
         [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
-        (( ${wait_count} > ${wait_max_attempts} )) && break
+
+        # Fail if reached maximum attempts
+        if (( ${wait_count} > ${wait_max_attempts} )); then
+            echo "ERROR: Timed out waiting for EBS volume to attach."
+            exit 1
+        fi
+
         echo "Waiting for EBS volume to attach (${wait_count})..."
-        sleep 5
+        sleep 10
     done
 
     # find additional data disk, format it and mount
