@@ -83,18 +83,47 @@ export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STAC
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
-    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
-    # Wait for data volume attachment (necessary with AWS EBS)
+    # Wait for EBS volume "available" status before attaching.
+    # When updating a spot stack, the volume may be in use by the previous instance which has not yet been terminated.
     wait_count=0
-    wait_max_attempts=12
+    wait_max_attempts=30
     while true
     do
         let "wait_count+=1"
-        # additional data disk is considered attached when number of disk attached to instance more than 1
+        # Check volume status. Non-empty output means volume is available and we can proceed.
+        result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
+        [[ "${result}" != "" ]] && break
+
+        # Fail if reached maximum attempts
+        if (( ${wait_count} > ${wait_max_attempts} )); then
+            echo "ERROR: Timed out waiting for EBS volume to be available."
+            exit 1
+        fi
+
+        echo "Waiting for EBS volume to become available (${wait_count})..."
+        sleep 10
+    done
+
+    # Attache the EBS volume to the instance
+    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
+
+    # Wait for data volume attachment to complete
+    wait_count=0
+    wait_max_attempts=6
+    while true
+    do
+        let "wait_count+=1"
+        # Consider additional data disk attached when number of disk attached to instance is > 1
         [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
-        (( ${wait_count} > ${wait_max_attempts} )) && break
+
+        # Fail if reached maximum attempts
+        if (( ${wait_count} > ${wait_max_attempts} )); then
+            echo "ERROR: Timed out waiting for EBS volume to attach."
+            exit 1
+        fi
+
         echo "Waiting for EBS volume to attach (${wait_count})..."
-        sleep 5
+        sleep 10
     done
 
     # find additional data disk, format it and mount
@@ -194,12 +223,15 @@ su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOC
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
 
-curl -s https://raw.githubusercontent.com/docksal/sandbox-server/spot/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
-
-sed -i 's/^GITHUB_TOKEN=""/GITHUB_TOKEN="'${GITHUB_TOKEN}'"/' /usr/local/bin/ssh-rake
-sed -i 's/^GITHUB_ORG_NAME=""/GITHUB_ORG_NAME="'${GITHUB_ORG_NAME}'"/' /usr/local/bin/ssh-rake
-sed -i 's/^GITHUB_TEAM_SLUG=""/GITHUB_TEAM_SLUG="'${GITHUB_TEAM_SLUG}'"/' /usr/local/bin/ssh-rake
-
-chmod +x /usr/local/bin/ssh-rake
-
-[[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]] && /usr/local/bin/ssh-rake install || true
+if [[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]]
+then
+    BACKUP_SSH_PUBLIC_KEY="$(curl -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key)"
+    # TODO: move ssh-rake script to separate repo
+    curl -s https://raw.githubusercontent.com/docksal/sandbox-server/develop/aws-cloudformation/scripts/ssh-rake -o /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_TOKEN=\".*\"|GITHUB_TOKEN=\"${GITHUB_TOKEN}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_ORG_NAME=\".*\"|GITHUB_ORG_NAME=\"${GITHUB_ORG_NAME}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^GITHUB_TEAM_SLUG=\".*\"|GITHUB_TEAM_SLUG=\"${GITHUB_TEAM_SLUG}\"|" /usr/local/bin/ssh-rake
+    sed -i "s|^BACKUP_SSH_PUBLIC_KEY=\".*\"|BACKUP_SSH_PUBLIC_KEY=\"${BACKUP_SSH_PUBLIC_KEY}\"|g" /usr/local/bin/ssh-rake
+    chmod +x /usr/local/bin/ssh-rake
+    /usr/local/bin/ssh-rake install
+fi
