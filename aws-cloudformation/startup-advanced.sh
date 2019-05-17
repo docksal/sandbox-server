@@ -76,6 +76,8 @@ export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} -
 export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTOKEN`].OutputValue' --output text)
 export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBORGNAME`].OutputValue' --output text)
 export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTEAMSLUG`].OutputValue' --output text)
+export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LETSENCRYPTCONFIG`].OutputValue' --output text)
+export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LETSENCRYPTDOMAIN`].OutputValue' --output text)
 
 # attach elastic ip
 [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
@@ -235,3 +237,27 @@ then
     chmod +x /usr/local/bin/ssh-rake
     /usr/local/bin/ssh-rake install
 fi
+
+if [[ "${LETSENCRYPT_CONFIG}" != "" ]] && [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
+then
+    pwd=$(pwd)
+    tmp=$(mktemp -d)
+    mkdir -p ${BUILD_USER_HOME}/.docksal/certs
+    git clone https://github.com/docksal/service-letsencrypt.git ${tmp}
+    cd ${tmp}
+    docker build -t docksal/letsencrypt:latest --build-arg FROM=alpine:3.9 .
+    docker rm -f docksal-letsencrypt || true 
+    docker run -d --restart always --name docksal-letsencrypt -v ${BUILD_USER_HOME}/.docksal/certs:/data/crt docksal/letsencrypt:latest
+    sleep 1
+    docker exec docksal-letsencrypt bash -c "export ${LETSENCRYPT_CONFIG}; acme.sh -k 4096 --issue --dns \${DSP} -d ${LETSENCRYPT_DOMAIN} -d *.${LETSENCRYPT_DOMAIN} --fullchain-file /data/crt/${LETSENCRYPT_DOMAIN}.crt --key-file /data/crt/${LETSENCRYPT_DOMAIN}.key"
+    cd ${pwd}
+    rm -rf ${tmp}
+    if [[ -f ${BUILD_USER_HOME}/.docksal/certs/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${BUILD_USER_HOME}/.docksal/certs/${LETSENCRYPT_DOMAIN}.crt ]]
+    then
+        sed -i '/DOCKSAL_VHOST_PROXY_DEFAULT_CERT/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+        echo DOCKSAL_VHOST_PROXY_DEFAULT_CERT=\"${LETSENCRYPT_DOMAIN}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+        chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+        fin system reset
+    fi
+fi
+
