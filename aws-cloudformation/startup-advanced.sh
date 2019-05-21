@@ -253,7 +253,6 @@ then
     docker run -d --restart always \
         --env-file env.file \
         --name ${ACMESH_CONTAINER} \
-        -v ${ACMESH_PATH}:/acme.sh \
         -v ${CERTOUT_PATH}:/out \
         neilpang/acme.sh daemon
 
