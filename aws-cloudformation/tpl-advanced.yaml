@@ -65,6 +65,14 @@ Parameters:
     Description: "Github team machine name. Users in this team will have access to Sandbox server"
     Type: String
     Default: ""
+  LETSENCRYPTCONFIG:
+    Description: "Configuration for getting LetsEncrypt SSL certificate. Info about ENV variables names: https://github.com/Neilpang/acme.sh/wiki/dnsapi Example: AWS_ACCESS_KEY_ID=\"aws_access_key_id\" AWS_SECRET_ACCESS_KEY=\"aws_secret_key\" DSP=\"dns_aws\""
+    Type: String
+    Default: ""
+  LETSENCRYPTDOMAIN:
+    Description: "Domain name for which the SSL certificate will be issued"
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -79,11 +87,16 @@ Metadata:
           - ExistingEIP
           - ExistingDataVolume
       - Label:
-          default: "Advanced: Optional"
+          default: "Github configuration: Optional"
         Parameters:
           - GITHUBTOKEN
           - GITHUBORGNAME
           - GITHUBTEAMSLUG
+      - Label:
+          default: "LetsEncrypt configuration: Optional"
+        Parameters:
+          - LETSENCRYPTCONFIG
+          - LETSENCRYPTDOMAIN
     ParameterLabels:
       ResourceType:
         default: "Resource type"
@@ -103,6 +116,10 @@ Metadata:
         default: "Github organization"
       GITHUBTEAMSLUG:
         default: "Github team"
+      LETSENCRYPTCONFIG:
+        default: "LetsEncrypt configuration"
+      LETSENCRYPTDOMAIN:
+        default: "Sandbox domain name"
 
 Mappings:
   Region2AMI:
@@ -307,5 +324,9 @@ Outputs:
     Value: !Ref GITHUBORGNAME
   GITHUBTEAMSLUG:
     Value: !Ref GITHUBTEAMSLUG
+  LETSENCRYPTCONFIG:
+    Value: !Ref LETSENCRYPTCONFIG
+  LETSENCRYPTDOMAIN:
+    Value: !Ref LETSENCRYPTDOMAIN
   InstanceURL:
     Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]

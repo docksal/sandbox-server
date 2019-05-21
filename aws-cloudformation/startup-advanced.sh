@@ -76,6 +76,8 @@ export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} -
 export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTOKEN`].OutputValue' --output text)
 export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBORGNAME`].OutputValue' --output text)
 export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GITHUBTEAMSLUG`].OutputValue' --output text)
+export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LETSENCRYPTCONFIG`].OutputValue' --output text)
+export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LETSENCRYPTDOMAIN`].OutputValue' --output text)
 
 # attach elastic ip
 [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
@@ -235,3 +237,43 @@ then
     chmod +x /usr/local/bin/ssh-rake
     /usr/local/bin/ssh-rake install
 fi
+
+if [[ "${LETSENCRYPT_CONFIG}" != "" ]] && [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
+then
+    ACMESH_CONTAINER="docksal-acme.sh"
+    ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
+    CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
+
+    tmp=$(mktemp)
+    printenv >${tmp}
+    eval "export ${LETSENCRYPT_CONFIG}"
+    printenv | diff -u "${tmp}" - | grep -E "^\+\w+" | sed 's/^+//' >env.file
+    
+    docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
+    docker run -d --restart always \
+        --env-file env.file \
+        --name ${ACMESH_CONTAINER} \
+        -v ${CERTOUT_PATH}:/out \
+        neilpang/acme.sh daemon
+
+    rm -f "${tmp}" env.file
+
+    docker exec ${ACMESH_CONTAINER} \
+        --issue \
+        --keylength 4096 \
+        --dns ${DSP} \
+        --domain ${LETSENCRYPT_DOMAIN} \
+        --domain *.${LETSENCRYPT_DOMAIN} \
+        --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
+        --key-file /out/${LETSENCRYPT_DOMAIN}.key \
+        --log /proc/1/fd/1
+
+    if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
+    then
+        sed -i '/DOCKSAL_VHOST_PROXY_DEFAULT_CERT/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+        echo DOCKSAL_VHOST_PROXY_DEFAULT_CERT=\"${LETSENCRYPT_DOMAIN}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+        chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+        fin system reset
+    fi
+fi
+
