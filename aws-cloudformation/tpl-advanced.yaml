@@ -87,13 +87,13 @@ Metadata:
           - ExistingEIP
           - ExistingDataVolume
       - Label:
-          default: "Advanced: Optional"
+          default: "Github configuration: Optional"
         Parameters:
           - GITHUBTOKEN
           - GITHUBORGNAME
           - GITHUBTEAMSLUG
       - Label:
-          default: "LetsEncrypt SSL certificates: Optional"
+          default: "LetsEncrypt configuration: Optional"
         Parameters:
           - LETSENCRYPTCONFIG
           - LETSENCRYPTDOMAIN

@@ -240,19 +240,36 @@ fi
 
 if [[ "${LETSENCRYPT_CONFIG}" != "" ]] && [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
 then
-    pwd=$(pwd)
-    tmp=$(mktemp -d)
-    mkdir -p ${BUILD_USER_HOME}/.docksal/certs
-    git clone https://github.com/docksal/service-letsencrypt.git ${tmp}
-    cd ${tmp}
-    docker build -t docksal/letsencrypt:latest --build-arg FROM=alpine:3.9 .
-    docker rm -f docksal-letsencrypt || true 
-    docker run -d --restart always --name docksal-letsencrypt -v ${BUILD_USER_HOME}/.docksal/certs:/data/crt docksal/letsencrypt:latest
-    sleep 1
-    docker exec docksal-letsencrypt bash -c "export ${LETSENCRYPT_CONFIG}; acme.sh -k 4096 --issue --dns \${DSP} -d ${LETSENCRYPT_DOMAIN} -d *.${LETSENCRYPT_DOMAIN} --fullchain-file /data/crt/${LETSENCRYPT_DOMAIN}.crt --key-file /data/crt/${LETSENCRYPT_DOMAIN}.key"
-    cd ${pwd}
-    rm -rf ${tmp}
-    if [[ -f ${BUILD_USER_HOME}/.docksal/certs/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${BUILD_USER_HOME}/.docksal/certs/${LETSENCRYPT_DOMAIN}.crt ]]
+    ACMESH_CONTAINER="docksal-acme.sh"
+    ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
+    CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
+
+    tmp=$(mktemp)
+    printenv >${tmp}
+    eval "export ${LETSENCRYPT_CONFIG}"
+    printenv | diff -u "${tmp}" - | grep -E "^\+\w+" | sed 's/^+//' >env.file
+    
+    docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
+    docker run -d --restart always \
+        --env-file env.file \
+        --name ${ACMESH_CONTAINER} \
+        -v ${ACMESH_PATH}:/acme.sh \
+        -v ${CERTOUT_PATH}:/out \
+        neilpang/acme.sh daemon
+
+    rm -f "${tmp}" env.file
+
+    docker exec ${ACMESH_CONTAINER} \
+        --issue \
+        --keylength 4096 \
+        --dns ${DSP} \
+        --domain ${LETSENCRYPT_DOMAIN} \
+        --domain *.${LETSENCRYPT_DOMAIN} \
+        --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
+        --key-file /out/${LETSENCRYPT_DOMAIN}.key \
+        --log /proc/1/fd/1
+
+    if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
     then
         sed -i '/DOCKSAL_VHOST_PROXY_DEFAULT_CERT/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
         echo DOCKSAL_VHOST_PROXY_DEFAULT_CERT=\"${LETSENCRYPT_DOMAIN}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
