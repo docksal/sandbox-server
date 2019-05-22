@@ -238,11 +238,12 @@ then
     /usr/local/bin/ssh-rake install
 fi
 
-if [[ "${LETSENCRYPT_CONFIG}" != "" ]] && [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
+if [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
 then
     ACMESH_CONTAINER="docksal-acme.sh"
     ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
     CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
+    DSP="dns_aws"
 
     tmp=$(mktemp)
     printenv >${tmp}
