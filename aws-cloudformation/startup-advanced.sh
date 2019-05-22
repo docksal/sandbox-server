@@ -243,7 +243,7 @@ then
     ACMESH_CONTAINER="docksal-acme.sh"
     ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
     CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
-    DSP="dns_aws"
+    DSP="${DSP:-dns_aws}"
 
     tmp=$(mktemp)
     printenv >${tmp}
