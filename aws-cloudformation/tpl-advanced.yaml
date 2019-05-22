@@ -243,6 +243,13 @@ Resources:
             - "ec2:AttachVolume"
             - "ec2:AssociateAddress"
             - "ec2:DescribeVolumes"
+            - "route53:GetHostedZone"
+            - "route53:ListHostedZones"
+            - "route53:ChangeResourceRecordSets"
+            - "route53:ListResourceRecordSets"
+            - "route53:GetHostedZoneCount"
+            - "route53:ListHostedZonesByName"
+
           Resource: "*"
       Roles:
         - !Ref InstanceRole
