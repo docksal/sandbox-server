@@ -262,8 +262,8 @@ then
         --issue \
         --keylength 4096 \
         --dns ${DSP} \
-        --domain ${LETSENCRYPT_DOMAIN} \
-        --domain *.${LETSENCRYPT_DOMAIN} \
+        --domain "${LETSENCRYPT_DOMAIN}" \
+        --domain "*.${LETSENCRYPT_DOMAIN}" \
         --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
         --key-file /out/${LETSENCRYPT_DOMAIN}.key \
         --log /proc/1/fd/1
