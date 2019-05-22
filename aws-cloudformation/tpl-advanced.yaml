@@ -243,6 +243,7 @@ Resources:
             - "ec2:AttachVolume"
             - "ec2:AssociateAddress"
             - "ec2:DescribeVolumes"
+            # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
             - "route53:ListHostedZones"
             - "route53:ChangeResourceRecordSets"
