@@ -53,23 +53,23 @@ Parameters:
     Description: "Manually set instance availability zone (default: us-east-2a)"
     Type: AWS::EC2::AvailabilityZone::Name
     Default: "us-east-2a"
-  GITHUBTOKEN:
+  GitHubToken:
     Description: "Github token with read:org access level"
     Type: String
     Default: ""
-  GITHUBORGNAME:
+  GitHubOrgName:
     Description: "Github organization machine name"
     Type: String
     Default: ""
-  GITHUBTEAMSLUG:
+  GitHubTeamSlug:
     Description: "Github team machine name. Users in this team will have access to Sandbox server"
     Type: String
     Default: ""
-  LETSENCRYPTCONFIG:
+  LetsEncryptConfig:
     Description: "Configuration for getting LetsEncrypt SSL certificate. Info about ENV variables names: https://github.com/Neilpang/acme.sh/wiki/dnsapi Example: AWS_ACCESS_KEY_ID=\"aws_access_key_id\" AWS_SECRET_ACCESS_KEY=\"aws_secret_key\" DSP=\"dns_aws\""
     Type: String
     Default: ""
-  LETSENCRYPTDOMAIN:
+  LetsEncryptDomain:
     Description: "Domain name for which the SSL certificate will be issued"
     Type: String
     Default: ""
@@ -89,14 +89,14 @@ Metadata:
       - Label:
           default: "Github configuration: Optional"
         Parameters:
-          - GITHUBTOKEN
-          - GITHUBORGNAME
-          - GITHUBTEAMSLUG
+          - GitHubToken
+          - GitHubOrgName
+          - GitHubTeamSlug
       - Label:
           default: "LetsEncrypt configuration: Optional"
         Parameters:
-          - LETSENCRYPTCONFIG
-          - LETSENCRYPTDOMAIN
+          - LetsEncryptConfig
+          - LetsEncryptDomain
     ParameterLabels:
       ResourceType:
         default: "Resource type"
@@ -110,15 +110,15 @@ Metadata:
         default: "Persistent data volume"
       ManualAZ:
         default: "Availability zone"
-      GITHUBTOKEN:
+      GitHubToken:
         default: "Github token"
-      GITHUBORGNAME:
+      GitHubOrgName:
         default: "Github organization"
-      GITHUBTEAMSLUG:
+      GitHubTeamSlug:
         default: "Github team"
-      LETSENCRYPTCONFIG:
+      LetsEncryptConfig:
         default: "LetsEncrypt configuration"
-      LETSENCRYPTDOMAIN:
+      LetsEncryptDomain:
         default: "Sandbox domain name"
 
 Mappings:
@@ -326,15 +326,15 @@ Outputs:
     Value: !Ref ExistingEIP
   PersistentVolume:
     Value: !Ref ExistingDataVolume
-  GITHUBTOKEN:
-    Value: !Ref GITHUBTOKEN
-  GITHUBORGNAME:
-    Value: !Ref GITHUBORGNAME
-  GITHUBTEAMSLUG:
-    Value: !Ref GITHUBTEAMSLUG
-  LETSENCRYPTCONFIG:
-    Value: !Ref LETSENCRYPTCONFIG
-  LETSENCRYPTDOMAIN:
-    Value: !Ref LETSENCRYPTDOMAIN
+  GitHubToken:
+    Value: !Ref GitHubToken
+  GitHubOrgName:
+    Value: !Ref GitHubOrgName
+  GitHubTeamSlug:
+    Value: !Ref GitHubTeamSlug
+  LetsEncryptConfig:
+    Value: !Ref LetsEncryptConfig
+  LetsEncryptDomain:
+    Value: !Ref LetsEncryptDomain
   InstanceURL:
     Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]
