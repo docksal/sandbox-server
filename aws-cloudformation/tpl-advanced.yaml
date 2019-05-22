@@ -65,12 +65,18 @@ Parameters:
     Description: "Github team machine name. Users in this team will have access to Sandbox server"
     Type: String
     Default: ""
-  LetsEncryptConfig:
-    Description: "Configuration for getting LetsEncrypt SSL certificate. Info about ENV variables names: https://github.com/Neilpang/acme.sh/wiki/dnsapi Example: AWS_ACCESS_KEY_ID=\"aws_access_key_id\" AWS_SECRET_ACCESS_KEY=\"aws_secret_key\" DSP=\"dns_aws\""
+  LetsEncryptDomain:
+    Description: |
+      Domain name for which the SSL certificate will be issued.
+      Example: for "example.com" an SNI wildcard cert will be issue covering both "example.com" and "*.example.com".
     Type: String
     Default: ""
-  LetsEncryptDomain:
-    Description: "Domain name for which the SSL certificate will be issued"
+  LetsEncryptConfig:
+    Description: |
+      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs).
+      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi
+      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key"
+      Note: Leave empty if the domain is managed in AWS Route53 in the same account.
     Type: String
     Default: ""
 
@@ -95,8 +101,8 @@ Metadata:
       - Label:
           default: "LetsEncrypt configuration: Optional"
         Parameters:
-          - LetsEncryptConfig
           - LetsEncryptDomain
+          - LetsEncryptConfig
     ParameterLabels:
       ResourceType:
         default: "Resource type"
@@ -116,10 +122,10 @@ Metadata:
         default: "Github organization"
       GitHubTeamSlug:
         default: "Github team"
-      LetsEncryptConfig:
-        default: "LetsEncrypt configuration"
       LetsEncryptDomain:
         default: "Sandbox domain name"
+      LetsEncryptConfig:
+        default: "LetsEncrypt configuration"
 
 Mappings:
   Region2AMI:
@@ -332,9 +338,9 @@ Outputs:
     Value: !Ref GitHubOrgName
   GitHubTeamSlug:
     Value: !Ref GitHubTeamSlug
-  LetsEncryptConfig:
-    Value: !Ref LetsEncryptConfig
   LetsEncryptDomain:
     Value: !Ref LetsEncryptDomain
+  LetsEncryptConfig:
+    Value: !Ref LetsEncryptConfig
   InstanceURL:
     Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]

@@ -76,8 +76,8 @@ export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} -
 export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubToken`].OutputValue' --output text)
 export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubOrgName`].OutputValue' --output text)
 export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubTeamSlug`].OutputValue' --output text)
-export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptConfig`].OutputValue' --output text)
 export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptDomain`].OutputValue' --output text)
+export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptConfig`].OutputValue' --output text)
 
 # attach elastic ip
 [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
