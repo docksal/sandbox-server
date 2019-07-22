@@ -5,7 +5,7 @@
 
 [[ $1 == "" ]] && { echo "Usage: $0 keyname"; exit; }
 
-[[ ! -f .ssh/${1}.pub ]] && { echo "Public key file not found in ~/.ssh/${1}.pub"; exit 1 }
+[[ ! -f $HOME/.ssh/${1}.pub ]] && { echo "Public key file not found in $HOME/.ssh/${1}.pub"; exit 1 }
 
 AWS_REGION=$(aws ec2 describe-regions --output text | awk '{print $3}' | xargs)
 

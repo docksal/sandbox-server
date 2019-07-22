@@ -5,9 +5,22 @@
 
 template_file="template.yaml"
 
-[[ "$1" != "" ]] && [[ "$2" != "" ]] || { echo "Usage: $0 stack-name keyname [instancetype]"; exit; }
-[[ "$3" != "" ]] && instance_opt="ParameterKey=InstanceType,ParameterValue=$3"
+instance_opt=""
+whitespace="[[:space:]]"
 
-aws cloudformation create-stack --stack-name $1 --template-body file://${template_file} --parameters ParameterKey=KeyName,ParameterValue=$2 ${instance_opt} >/dev/null && echo "Creation stack $1 is in progress..." || exit 1
-aws cloudformation wait stack-create-complete --stack-name $1 && echo "Stack $1 created!" || { echo "Timeout creation stack $1"; exit 1; }
-aws cloudformation describe-stacks --stack-name $1
+while [ "$1" != "" ]; do
+    [[ "$1" =~ ${whitespace} ]] && arg=${1/=/=\"}\" || arg="${1}"
+    eval "${arg}"
+    shift
+done
+
+[[ "${stackname}" == "" ]] && { echo "Error: stackname is empty"; echo "Usage: $0 stackname=stackname keyname=keyname [instancetype=instancetype] [resourcetype=ec2|spot]"; exit; }
+[[ "${keyname}" == "" ]] && { echo "Error: keyname is empty"; echo "Usage: $0 stackname=stackname keyname=keyname [instancetype=instancetype] [resourcetype=ec2|spot]"; exit; }
+[[ "${instancetype}" != "" ]] && instance_opt+="ParameterKey=InstanceType,ParameterValue=${instancetype} "
+[[ "${resourcetype}" != "" ]] && instance_opt+="ParameterKey=ResourceType,ParameterValue=${resourcetype} "
+
+scripts/bash2yaml startup.sh
+
+aws cloudformation create-stack --stack-name "${stackname}" --capabilities CAPABILITY_IAM --template-body file://${template_file} --parameters ParameterKey=KeyName,ParameterValue="${keyname}" ${instance_opt} >/dev/null && echo "Creation stack ${stackname} is in progress..." || exit 1
+aws cloudformation wait stack-create-complete --stack-name "${stackname}" && echo "Stack "${stackname}" created!" || { echo "Timeout creation stack ${stackname}"; exit 1; }
+aws cloudformation describe-stacks --stack-name "${stackname}"

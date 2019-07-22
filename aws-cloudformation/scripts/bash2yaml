@@ -3,13 +3,25 @@
 # This script converts bash scripts to yaml format and create ready to deploy template.yaml
 #
 
-[[ "$1" == "" ]] && { echo "Usage: $0 script filename"; exit; }
+[[ "$2" == "" ]] && { echo "Usage: $0 bash_script template_file"; exit; }
 
-template_file="template.tpl.yaml"
+template_file="$2"
 
-line_num=`grep -n "^[[:space:]]*- - |" ${template_file} | cut -d':' -f 1`
-head -n ${line_num} ${template_file} >template.yaml
-sed 's/^/              /g' $1 >>template.yaml
-tail -n +$(expr ${line_num} + 1) ${template_file} >>template.yaml
+lines_num=`grep -n "^[[:space:]]*- - |" ${template_file} | cut -d':' -f 1`
+
+:>template.yaml
+
+prev_line_num=1
+
+for line_num in ${lines_num}
+do
+	sed -n ${prev_line_num},${line_num}p ${template_file} >>template.yaml
+	line=$(sed -n ${line_num}p ${template_file})
+	prepend=$(printf %$(expr ${#line} - 1)s)
+	sed "s/^/${prepend}/g" $1 >>template.yaml
+	prev_line_num=$(expr ${line_num} + 1)
+done
+
+tail -n +${prev_line_num} ${template_file} >>template.yaml
 
 

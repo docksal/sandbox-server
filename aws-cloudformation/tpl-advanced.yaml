@@ -1,0 +1,346 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Sandbox server template (advanced)
+
+Parameters:
+  ResourceType:
+    Description: "Resource type (default: ec2)"
+    Type: String
+    Default: ec2
+    AllowedValues:
+      - ec2
+      - spot
+  InstanceType:
+    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
+    Type: String
+    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
+    # t3.small: 2 vCPU, 2GB RAM
+    Default: t3.small
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m5d.large
+      - m5d.xlarge
+      - m5d.2xlarge
+      - m5d.4xlarge
+      - r5.large
+      - r5.xlarge
+      - r5.2xlarge
+      - r5d.large
+      - r5d.xlarge
+      - r5d.2xlarge
+    ConstraintDescription: "Must be a valid EC2 instance type"
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
+  ExistingEIP:
+    Description: "Use an existing Elastic IP for the instance"
+    Type: String
+    Default: ""
+  ExistingDataVolume:
+    Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
+    Type: "AWS::EC2::Volume::Id"
+  ManualAZ:
+    Description: "Manually set instance availability zone (default: us-east-2a)"
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: "us-east-2a"
+  GitHubToken:
+    Description: "Github token with read:org access level"
+    Type: String
+    Default: ""
+  GitHubOrgName:
+    Description: "Github organization machine name"
+    Type: String
+    Default: ""
+  GitHubTeamSlug:
+    Description: "Github team machine name. Users in this team will have access to Sandbox server"
+    Type: String
+    Default: ""
+  LetsEncryptDomain:
+    Description: |
+      Domain name for which the SSL certificate will be issued.
+      Example: for "example.com" an SNI wildcard cert will be issue covering both "example.com" and "*.example.com".
+    Type: String
+    Default: ""
+  LetsEncryptConfig:
+    Description: |
+      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs).
+      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi
+      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key"
+      Note: Leave empty if the domain is managed in AWS Route53 in the same account.
+    Type: String
+    Default: ""
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Basic: Required"
+        Parameters:
+          - ResourceType
+          - InstanceType
+          - KeyName
+          - ManualAZ
+          - ExistingEIP
+          - ExistingDataVolume
+      - Label:
+          default: "Github configuration: Optional"
+        Parameters:
+          - GitHubToken
+          - GitHubOrgName
+          - GitHubTeamSlug
+      - Label:
+          default: "LetsEncrypt configuration: Optional"
+        Parameters:
+          - LetsEncryptDomain
+          - LetsEncryptConfig
+    ParameterLabels:
+      ResourceType:
+        default: "Resource type"
+      InstanceType:
+        default: "Instance type"
+      KeyName:
+        default: "SSH key"
+      ExistingEIP:
+        default: "Elastic IP"
+      ExistingDataVolume:
+        default: "Persistent data volume"
+      ManualAZ:
+        default: "Availability zone"
+      GitHubToken:
+        default: "Github token"
+      GitHubOrgName:
+        default: "Github organization"
+      GitHubTeamSlug:
+        default: "Github team"
+      LetsEncryptDomain:
+        default: "Sandbox domain name"
+      LetsEncryptConfig:
+        default: "LetsEncrypt configuration"
+
+Mappings:
+  Region2AMI:
+    ap-south-1:
+      AMI: ami-0d773a3b7bb2bb1c1
+    eu-west-3:
+      AMI: ami-08182c55a1c188dee
+    eu-west-2:
+      AMI: ami-0b0a60c0a2bd40612
+    eu-west-1:
+      AMI: ami-00035f41c82244dab
+    ap-northeast-2:
+      AMI: ami-06e7b9c5e0c4dd014
+    ap-northeast-1:
+      AMI: ami-07ad4b1c3af1ea214
+    sa-east-1:
+      AMI: ami-03c6239555bb12112
+    ca-central-1:
+      AMI: ami-0427e8367e3770df1
+    ap-southeast-1:
+      AMI: ami-0c5199d385b432989
+    ap-southeast-2:
+      AMI: ami-07a3bd4944eb120a0
+    eu-central-1:
+      AMI: ami-0bdf93799014acdc4
+    us-east-1:
+      AMI: ami-0ac019f4fcb7cb7e6
+    us-east-2:
+      AMI: ami-0f65671a86f061fcd
+    us-west-1:
+      AMI: ami-063aa838bd7631e0b
+    us-west-2:
+      AMI: ami-0bbe6b35405ecebdb
+
+Conditions:
+  CreateEC2: !Equals [!Ref ResourceType, "ec2"]
+  CreateSpot: !Equals [!Ref ResourceType, "spot"]
+
+Resources:
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable SSH, HTTP, HTTPS'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+
+  FleetRole:
+    Type: AWS::IAM::Role
+    Condition: CreateSpot
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - spotfleet.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  FleetPolicies:
+    Type: AWS::IAM::Policy
+    Condition: CreateSpot
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - "ec2:DescribeImages"
+            - "ec2:DescribeSubnets"
+            - "ec2:RequestSpotInstances"
+            - "ec2:TerminateInstances"
+            - "ec2:DescribeInstanceStatus"
+            - "iam:PassRole"
+            - "cloudformation:DescribeStacks"
+            - "ec2:DescribeInstances"
+            - "ec2:CreateTags"
+          Resource: "*"
+      Roles:
+        - !Ref FleetRole
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  InstancePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - "cloudformation:DescribeStacks"
+            - "ec2:DescribeInstances"
+            - "ec2:AttachVolume"
+            - "ec2:AssociateAddress"
+            - "ec2:DescribeVolumes"
+            # Permissions necessary for TXT record updates in Route53
+            - "route53:GetHostedZone"
+            - "route53:ListHostedZones"
+            - "route53:ChangeResourceRecordSets"
+            - "route53:ListResourceRecordSets"
+            - "route53:GetHostedZoneCount"
+            - "route53:ListHostedZonesByName"
+
+          Resource: "*"
+      Roles:
+        - !Ref InstanceRole
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref InstanceRole
+
+  spotInstance:
+    Type: 'AWS::EC2::SpotFleet'
+    Condition: CreateSpot
+    Properties:
+      SpotFleetRequestConfigData:
+        TargetCapacity: 1
+        IamFleetRole: !GetAtt FleetRole.Arn
+        LaunchSpecifications:
+          - InstanceType: !Ref InstanceType
+            IamInstanceProfile:
+              Arn:
+                Fn::GetAtt:
+                  - InstanceProfile
+                  - Arn
+            Placement:
+              AvailabilityZone: !Ref ManualAZ
+            TagSpecifications:
+              - ResourceType: instance
+                Tags:
+                - Key: StackId
+                  Value: !Ref AWS::StackId
+            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+            KeyName: !Ref KeyName
+            SecurityGroups:
+              - GroupId: !GetAtt InstanceSecurityGroup.GroupId
+            BlockDeviceMappings:
+            # Root volume
+              - DeviceName: /dev/sda1
+                Ebs:
+                  VolumeSize: '8'
+            UserData: !Base64
+              'Fn::Join':
+                - ''
+                - - |
+
+  ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Condition: CreateEC2
+    Properties:
+      IamInstanceProfile: !Ref InstanceProfile
+      InstanceType: !Ref InstanceType
+      AvailabilityZone: !Ref ManualAZ
+      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      KeyName: !Ref KeyName
+      Tags:
+      - Key: StackId
+        Value: !Ref AWS::StackId
+      SecurityGroups:
+        - !Ref InstanceSecurityGroup
+      BlockDeviceMappings:
+        # Root volume
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: '8'
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+
+Outputs:
+  IPAddress:
+    Value: !Ref ExistingEIP
+  PersistentVolume:
+    Value: !Ref ExistingDataVolume
+  GitHubToken:
+    Value: !Ref GitHubToken
+  GitHubOrgName:
+    Value: !Ref GitHubOrgName
+  GitHubTeamSlug:
+    Value: !Ref GitHubTeamSlug
+  LetsEncryptDomain:
+    Value: !Ref LetsEncryptDomain
+  LetsEncryptConfig:
+    Value: !Ref LetsEncryptConfig
+  InstanceURL:
+    Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]

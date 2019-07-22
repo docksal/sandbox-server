@@ -1,6 +1,6 @@
 # Docksal Sandbox Server
 
-Ready to use templates to launch a Docksal Sandbox Server in the cloud.
+Turn-key templates to launch a Docksal Sandbox Server in the cloud.
 
 ## Launch a sandbox server
 
@@ -9,7 +9,7 @@ Follow the instructions for supported cloud providers:
 - [Amazon Web Services](./aws-cloudformation)
 - [Google Cloud Platform](./gcp-deployment-manager)
 
-Once done there, come back and continue reading.
+When done, come back and continue reading.
 
 <a name="server-access"></a>
 ## Access the sandbox server

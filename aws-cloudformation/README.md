@@ -11,16 +11,27 @@ AWS CloudFormation handles all of that.
 
 For an overview of AWS CloudFormation, see the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.)
 
-## Quick setup (using CloudFormation web UI)
+## Features
+
+- Turn-key AWS infrastructure provisioning using CloudFormation
+- Basic mode: very few questions asked, quick and easy
+- Advanced mode: includes all advanced settings and features
+  - EC2 Spot mode support (cuts compute costs up to 80%)
+  - SSH authentication with the server via Github teams
+  - LetsEncrypt integration
+
+
+## Basic mode: Quick setup (using CloudFormation web UI)
 
 If you have an existing AWS account (with billing and an SSH key pair), just click on the button below!
 
-[![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/stable/template.yaml)
+[![Launch Basic Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/stable/basic.yaml)
 
 You will be prompted for:
 
 - Instance type
 - SSH key name
+- Data disk size
 
 Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation (`<external-ip>`). 
 
@@ -32,7 +43,7 @@ Note: For manual setup steps (using console tools), see [Manual setup](#manual)
 
 
 <a name="manual"></a>
-## Manual setup (using console tools)
+## Basic mode: Manual setup (using console tools)
 
 Step-by-step manual setup instructions using aws cli and provisioning scripts. 
 
@@ -98,3 +109,27 @@ You can now proceed to [Access the sandbox server](/README.md#server-access)
 To delete the deployment and all the resources that were created:
 
     ./delete-stack <stack-name>
+
+
+## Advanced mode: Quick setup (using CloudFormation web UI)
+
+If you have an existing AWS account (with billing and an SSH key pair), just click on the button below!
+
+[![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/stable/advanced.yaml)
+
+You will be prompted for:
+
+- Resource type (`ec2` vs `spot`)
+- Instance type
+- SSH key name
+- Availability zone
+- Elastic IP
+- Persistent data volume
+- Github configuration - used for SSH authentication (options)
+- LetsEncrypt configuration (optional)
+
+Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation (`<external-ip>`). 
+
+Note: You will need the key you selected to access the sandbox server in further steps (`<ssh-private-key>`).
+
+You can now proceed to [Access the sandbox server](/README.md#server-access) 

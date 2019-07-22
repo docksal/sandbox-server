@@ -10,7 +10,7 @@ set -e  # Fail on errors
 
 # Persistent disk settings
 DATA_DISK="/dev/sdb"
-MOUNT_POINT="/mnt/data"
+MOUNT_POINT="/data"
 BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
 BUILD_USER_HOME="/home/${BUILD_USER}"
@@ -30,7 +30,7 @@ if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
 fi
 
 # Mount the persistent data disk if it was attached
-if lsblk ${DATA_DISK} > /dev/null 2>&1; then
+if lsblk ${DATA_DISK} &>/dev/null; then
 	echo "Using persistent disk: ${DATA_DISK} for data storage: ${MOUNT_POINT}"
 
 	# Format the disk if necessary
@@ -66,9 +66,18 @@ fi
 # Create the projects/builds directory
 mkdir -p ${PROJECTS_ROOT}
 
+# SSH settings: ensure ~/.ssh exists for the build user
+mkdir -p ${BUILD_USER_HOME}/.ssh
+
+# SSH settings: authorized_keys
+# If ~/.ssh/authorized_keys does not exist for the build user, reuse the one from the default user account (ubuntu)
+if [[ ! -f "${BUILD_USER_HOME}/.ssh/authorized_keys" ]]; then
+	cp "/home/ubuntu/.ssh/authorized_keys" "${BUILD_USER_HOME}/.ssh/authorized_keys"
+	chown ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/.ssh/authorized_keys"
+fi
+
 # SSH settings: disable the host key check
 if [[ ! -f "${BUILD_USER_HOME}/.ssh/config" ]]; then
-	mkdir -p ${BUILD_USER_HOME}/.ssh
 	tee "${BUILD_USER_HOME}/.ssh/config" <<EOF
 Host *
   StrictHostKeyChecking no

@@ -9,8 +9,8 @@ set -x  # Print commands
 set -e  # Fail on errors
 
 # Persistent disk settings
-DATA_DISK="/dev/xvdp"
-MOUNT_POINT="/mnt/data"
+DISK_LABEL="data-volume"
+MOUNT_POINT="/data"
 BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
 BUILD_USER_HOME="/home/${BUILD_USER}"
@@ -19,6 +19,45 @@ DOCKSAL_VERSION="master"
 PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
+
+mount_part()
+{
+    DATA_DISK=$1
+    # mark disk with label
+    tune2fs -L ${DISK_LABEL} ${DATA_DISK} >/dev/null 2>&1
+    # Mount the data disk
+    mkdir -p ${MOUNT_POINT}
+    cp /etc/fstab /etc/fstab.backup
+    # Write disk mount to /etc/fstab (so that it persists on reboots)
+    # Equivalent of `mount /dev/sdb /mnt/data`
+    echo "LABEL=${DISK_LABEL} ${MOUNT_POINT}  ext4  defaults,nofail  0 2" | tee -a /etc/fstab
+    mount -a
+}
+
+create_fs()
+{
+    # creating ext4 fs and add label
+    DATA_DISK=$1
+    mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK} -L ${DISK_LABEL} >/dev/null 2>&1
+}
+
+get_part_list()
+{
+    # get disk partitions info.
+    # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
+    # in our case will be only one string
+    DATA_DISK=$1
+    partprobe
+    lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} | grep part | sed 's/ /;/g'
+}
+
+create_part()
+{
+    # create msdos partition table and create primary partition used 100% disk size
+    DATA_DISK=$1
+    /sbin/parted ${DATA_DISK} -s mklabel msdos
+    /sbin/parted ${DATA_DISK} -s -a optimal mkpart primary 0% 100%
+}
 
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
@@ -29,23 +68,43 @@ if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
 	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
 
-# Mount the persistent data disk if it was attached
-if lsblk ${DATA_DISK} > /dev/null 2>&1; then
-	echo "Using persistent disk: ${DATA_DISK} for data storage: ${MOUNT_POINT}"
+# Wait for data volume attachment (necessary with AWS EBS)
+wait_count=0
+wait_max_attempts=6
+while true
+do
+    let "wait_count+=1"
+    # additional data disk is considered attached when number of disk attached to instance more than 1
+    [[ "$(lsblk -p -n -o NAME,TYPE | grep disk | wc -l)" > 1 ]] && break
 
-	# Format the disk if necessary
-	if [[ $(lsblk -f ${DATA_DISK}) != *ext4* ]]; then
-		mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK}
+	# Fail if reached maximum attempts
+	if (( ${wait_count} > ${wait_max_attempts} )); then
+		echo "ERROR: Timed out waiting for EBS volume to attach."
+		exit 1
 	fi
 
-	# Mount the data disk
-	mkdir -p ${MOUNT_POINT}
-	cp /etc/fstab /etc/fstab.backup
-	# Write disk mount to /etc/fstab (so that it persists on reboots)
-	# Equivalent of `mount /dev/sdb /mnt/data`
-	echo "${DATA_DISK}  ${MOUNT_POINT}  ext4  defaults,nofail  0 2" | tee -a /etc/fstab
-	mount -a
+    echo "Waiting for EBS volume to attach (${wait_count})..."
+    sleep 10
+done
 
+# find additional data disk, format it and mount
+for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
+do
+    # partitioning disk if disk is clean
+    [[ $(get_part_list "${disk}") == "" ]] && { echo "Disk ${disk} is clean! Creating partition..."; create_part "${disk}"; }
+    eval $(echo $(get_part_list "${disk}"))
+    # skip disk if his partition is mounted
+    [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
+    # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
+    [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
+    # create fs and mount when we already have partition, but fs not created yet
+    echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
+    create_fs "${NAME}"
+    mount_part "${NAME}"
+done
+
+if [ -d $MOUNT_POINT ]
+then
 	# Move BUILD_USER_HOME to the data disk
 	# E.g. /home/build-agent => /mnt/data/home/build-agent
 	if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
