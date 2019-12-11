@@ -50,8 +50,20 @@ get_part_list()
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
     # in our case will be only one string
     DATA_DISK=$1
-    partprobe
-    lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} | grep part | sed 's/ /;/g'
+    hdparm -z ${DATA_DISK} >/dev/null 2>&1 || true
+    result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | grep part | sed 's/ /;/g')"
+    if [[ "${result}" == "" ]]
+    then
+        result='NAME="";TYPE="";FSTYPE="";LABEL="";MOUNTPOINT=""'
+    fi
+    eval $(echo "${result}")
+    # check filesystem type by separate command execution. (first lsblk execution does not return fstype and volume label)
+    if [[ "${NAME}" != "" ]] && [[ "${FSTYPE}" == "" ]]
+    then
+        blkid ${NAME} >/dev/null 2>&1 || true
+        result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${NAME} 2>&1 | grep part | sed 's/ /;/g')"
+        eval $(echo "${result}")
+    fi
 }
 
 create_part()
@@ -131,13 +143,21 @@ then
     # find additional data disk, format it and mount
     for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
     do
+        # get partition info
+        get_part_list "${disk}"
         # partitioning disk if disk is clean
-        [[ $(get_part_list "${disk}") == "" ]] && { echo "Disk ${disk} is clean! Creating partition..."; create_part "${disk}"; }
-        eval $(echo $(get_part_list "${disk}"))
+        if [[ "$NAME" == "" ]]
+        then
+            echo "Disk ${disk} is clean! Creating partition..."
+            create_part "${disk}"
+            # get new partition info after partition changes
+            get_part_list "${disk}"
+        fi
         # skip disk if his partition is mounted
         [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
         # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
         [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
+        # try to fix errors on fs
         # create fs and mount when we already have partition, but fs not created yet
         echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
         create_fs "${NAME}"
