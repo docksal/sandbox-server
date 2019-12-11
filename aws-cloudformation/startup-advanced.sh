@@ -157,7 +157,6 @@ then
         [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
         # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
         [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
-        # try to fix errors on fs
         # create fs and mount when we already have partition, but fs not created yet
         echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
         create_fs "${NAME}"
