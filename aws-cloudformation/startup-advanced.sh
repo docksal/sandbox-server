@@ -22,6 +22,15 @@ PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
 ##########
 # Functions begin
+reread_device()
+{
+    DEVICE=$1
+    hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
+    file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
+    partprobe ${DEVICE} >>/var/log/device.log 2>&1 || true
+    blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
+    fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
+}
 
 mount_part()
 {
@@ -50,7 +59,7 @@ get_part_list()
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
     # in our case will be only one string
     DATA_DISK=$1
-    hdparm -z ${DATA_DISK} >/dev/null 2>&1 || true
+    reread_device "$DATA_DISK"
     result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | grep part | sed 's/ /;/g')"
     if [[ "${result}" == "" ]]
     then
@@ -60,7 +69,7 @@ get_part_list()
     # check filesystem type by separate command execution. (first lsblk execution does not return fstype and volume label)
     if [[ "${NAME}" != "" ]] && [[ "${FSTYPE}" == "" ]]
     then
-        blkid ${NAME} >/dev/null 2>&1 || true
+        reread_device "${NAME}"
         result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${NAME} 2>&1 | grep part | sed 's/ /;/g')"
         eval $(echo "${result}")
     fi
