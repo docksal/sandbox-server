@@ -25,11 +25,11 @@ PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 reread_device()
 {
     DEVICE=$1
-    #hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
-    #file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
+    hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
+    file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
     partprobe ${DEVICE} >>/var/log/device.log 2>&1 || true
-    #blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
-    #fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
+    blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
+    fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
 }
 
 mount_part()
