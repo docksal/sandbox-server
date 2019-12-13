@@ -25,11 +25,11 @@ PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 reread_device()
 {
     DEVICE=$1
-    hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
-    file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
+    #hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
+    #file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
     partprobe ${DEVICE} >>/var/log/device.log 2>&1 || true
-    blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
-    fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
+    #blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
+    #fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
 }
 
 mount_part()
@@ -53,26 +53,23 @@ create_fs()
     mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK} -L ${DISK_LABEL} >/dev/null 2>&1
 }
 
-get_part_list()
+get_disk_info()
 {
-    # get disk partitions info.
+    # get disk/partitions info.
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
-    # in our case will be only one string
     DATA_DISK=$1
     reread_device "$DATA_DISK"
-    result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | grep part | sed 's/ /;/g')"
-    if [[ "${result}" == "" ]]
-    then
-        result='NAME="";TYPE="";FSTYPE="";LABEL="";MOUNTPOINT=""'
-    fi
-    eval $(echo "${result}")
-    # check filesystem type by separate command execution. (first lsblk execution does not return fstype and volume label)
-    if [[ "${NAME}" != "" ]] && [[ "${FSTYPE}" == "" ]]
-    then
-        reread_device "${NAME}"
-        result="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${NAME} 2>&1 | grep part | sed 's/ /;/g')"
-        eval $(echo "${result}")
-    fi
+    device_list="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | sed 's/ /;/g')"
+    while read device_info
+    do
+      eval ${device_info}
+      # exit if device already mounted
+      [[ ${MOUNTPOINT} != "" ]] && return
+      # exit if device has ext4 fs
+      [[ ${FSTYPE} == "ext4" ]] && return
+    done <<< ${device_list}
+    # if not found ext4 fs return empty data for creating new fs
+    NAME=""; TYPE=""; FSTYPE=""; LABEL=""; MOUNTPOINT=""
 }
 
 create_part()
@@ -80,7 +77,6 @@ create_part()
     # create msdos partition table and create primary partition used 100% disk size
     DATA_DISK=$1
     /sbin/parted ${DATA_DISK} -s mklabel msdos
-    /sbin/parted ${DATA_DISK} -s -a optimal mkpart primary 0% 100%
 }
 
 ##########
@@ -118,23 +114,14 @@ done
 for disk in $(lsblk -d -p -n -o NAME,TYPE | grep disk | cut -d' ' -f1)
 do
     # get partition info
-    get_part_list "${disk}"
-    # partitioning disk if disk is clean
-    if [[ "$NAME" == "" ]]
-    then
-        echo "Disk ${disk} is clean! Creating partition..."
-        create_part "${disk}"
-        # get new partition info after partition changes
-        get_part_list "${disk}"
-    fi
-    # skip disk if his partition is mounted
-    [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $disk have partition $NAME, and it already mounted! Skipping..."; continue; }
-    # mount disk partition if ext4 fs found, but not mounted (volume was added from another instance)
-    [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $disk have partition $NAME with FS, but not mounted! Mounting..."; mount_part "$NAME"; continue; }
-    # create fs and mount when we already have partition, but fs not created yet
-    echo "Disk $disk have partition $NAME, but does not have FS! Creating FS and mounting..."
-    create_fs "${NAME}"
-    mount_part "${NAME}"
+    get_disk_info "${disk}"
+    [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $NAME already mounted! Skipping..."; continue; }
+    [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $NAME have ext4 filesystem but not mounted! Mounting..."; mount_part "$NAME"; continue; }
+    echo "Disk ${disk} is clean! Creating partition..."
+    wipefs -fa ${disk} >/dev/null
+    create_part "${disk}"
+    create_fs "${disk}"
+    mount_part "${disk}"
 done
 
 if [ -d $MOUNT_POINT ]
