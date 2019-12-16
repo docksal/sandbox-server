@@ -438,5 +438,7 @@ Outputs:
     Value: !Ref LetsEncryptDomain
   LetsEncryptConfig:
     Value: !Ref LetsEncryptConfig
+  ArtifactsS3Bucket:
+    Value: !Ref ArtifactsS3Bucket
   InstanceURL:
     Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]

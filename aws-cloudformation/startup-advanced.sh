@@ -95,6 +95,7 @@ export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK
 export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubTeamSlug`].OutputValue' --output text)
 export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptDomain`].OutputValue' --output text)
 export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptConfig`].OutputValue' --output text)
+export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsS3Bucket`].OutputValue' --output text)
 
 # attach elastic ip
 [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
@@ -293,3 +294,10 @@ then
     fi
 fi
 
+if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
+then
+    sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+    echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+    chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+    fin system reset
+fi
