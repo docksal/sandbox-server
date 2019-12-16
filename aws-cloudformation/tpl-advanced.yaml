@@ -79,6 +79,13 @@ Parameters:
       Note: Leave empty if the domain is managed in AWS Route53 in the same account.
     Type: String
     Default: ""
+  EnableS3ArtifactsBucket:
+    Description: "Enable S3 artifacts bucket (default: false)"
+    Type: String
+    Default: false
+    AllowedValues:
+      - false
+      - true
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -92,6 +99,7 @@ Metadata:
           - ManualAZ
           - ExistingEIP
           - ExistingDataVolume
+          - EnableS3ArtifactsBucket
       - Label:
           default: "Github configuration: Optional"
         Parameters:
@@ -126,6 +134,8 @@ Metadata:
         default: "Sandbox domain name"
       LetsEncryptConfig:
         default: "LetsEncrypt configuration"
+      EnableS3ArtifactsBucket:
+        default: "Enable S3 artifacts bucket"
 
 Mappings:
   Region2AMI:
@@ -165,8 +175,41 @@ Mappings:
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
+  ArtifactsS3Enabled: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
 
 Resources:
+  ArtifactsS3Bucket:
+    Type: AWS::S3::Bucket
+    Condition: ArtifactsS3Enabled
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - Id: "DeleteObjectsOlderThanYear"
+            ExpirationInDays: 365
+            Status: Enabled
+
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: ArtifactsS3Bucket
+    Properties:
+      Bucket: !Ref ArtifactsS3Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowReadWriteAcces
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - !If [ CreateEC2, !GetAtt ec2InstanceRole.Arn, !Ref "AWS::NoValue" ]
+                - !If [ CreateSpot, !GetAtt spotInstanceRole.Arn, !Ref "AWS::NoValue" ]
+            Action:
+              - s3:List*
+              - s3:Get*
+              - s3:*Object*
+            Resource:
+              - !Sub arn:aws:s3:::${ArtifactsS3Bucket}
+              - !Sub arn:aws:s3:::${ArtifactsS3Bucket}/*
+
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
