@@ -223,8 +223,9 @@ Resources:
       Roles:
         - !Ref FleetRole
 
-  InstanceRole:
+  ec2InstanceRole:
     Type: AWS::IAM::Role
+    Condition: CreateEC2
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -237,8 +238,9 @@ Resources:
           - sts:AssumeRole
       Path: "/"
 
-  InstancePolicies:
+  ec2InstancePolicies:
     Type: AWS::IAM::Policy
+    Condition: CreateEC2
     Properties:
       PolicyName: root
       PolicyDocument:
@@ -258,17 +260,66 @@ Resources:
             - "route53:ListResourceRecordSets"
             - "route53:GetHostedZoneCount"
             - "route53:ListHostedZonesByName"
-
           Resource: "*"
       Roles:
-        - !Ref InstanceRole
+        - !Ref ec2InstanceRole
 
-  InstanceProfile:
+  ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
+    Condition: CreateEC2
     Properties:
       Path: "/"
       Roles:
-        - !Ref InstanceRole
+        - !Ref ec2InstanceRole
+
+  spotInstanceRole:
+    Type: AWS::IAM::Role
+    Condition: CreateSpot
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+
+  spotInstancePolicies:
+    Type: AWS::IAM::Policy
+    Condition: CreateSpot
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - "cloudformation:DescribeStacks"
+            - "ec2:DescribeInstances"
+            - "ec2:AttachVolume"
+            - "ec2:AssociateAddress"
+            - "ec2:DescribeVolumes"
+            # Permissions necessary for TXT record updates in Route53
+            - "route53:GetHostedZone"
+            - "route53:ListHostedZones"
+            - "route53:ChangeResourceRecordSets"
+            - "route53:ListResourceRecordSets"
+            - "route53:GetHostedZoneCount"
+            - "route53:ListHostedZonesByName"
+          Resource: "*"
+      Roles:
+        - !Ref spotInstanceRole
+
+  spotInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: CreateSpot
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref spotInstanceRole
 
   spotInstance:
     Type: 'AWS::EC2::SpotFleet'
@@ -282,7 +333,7 @@ Resources:
             IamInstanceProfile:
               Arn:
                 Fn::GetAtt:
-                  - InstanceProfile
+                  - spotInstanceProfile
                   - Arn
             Placement:
               AvailabilityZone: !Ref ManualAZ
@@ -309,7 +360,7 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Condition: CreateEC2
     Properties:
-      IamInstanceProfile: !Ref InstanceProfile
+      IamInstanceProfile: !Ref ec2InstanceProfile
       InstanceType: !Ref InstanceType
       AvailabilityZone: !Ref ManualAZ
       ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
