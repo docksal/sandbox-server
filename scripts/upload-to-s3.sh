@@ -28,6 +28,7 @@ is_pr ()
 IFS='.' read -a ver_arr <<< "$TRAVIS_TAG"
 VERSION_MAJOR=${ver_arr[0]#v*}  # 2.7.0 => "2"
 VERSION_MINOR=${ver_arr[1]}  # "2.7.0" => "7"
+VERSION_HOTFIX=${ver_arr[2]}  # "2.7.0" => "0"
 
 EDGE_UPLOAD_DIR=${UPLOAD_DIR}/edge
 STABLE_UPLOAD_DIR=${UPLOAD_DIR}/stable
@@ -43,6 +44,7 @@ elif is_stable; then
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${STABLE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
 elif is_release; then
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}.${VERSION_HOTFIX}/${TEMPLATE_TYPE}.yaml --acl public-read
 else
 	# Exit if not on develop, master or release tag
 	exit 0
