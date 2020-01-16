@@ -296,8 +296,28 @@ fi
 
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
+    mkdir -p ${BUILD_USER_HOME}/artifacts
     sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
     echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
     chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+
+    apt-get -y install libgcrypt20 s3fs
+
+    echo "#!/bin/bash" >/etc/rc.local
+    echo "set -x" >>/etc/rc.local
+    echo "count=0" >>/etc/rc.local
+    echo "while [ \${count} -lt 5 ]" >>/etc/rc.local
+    echo "do" >>/etc/rc.local
+    echo "  aws s3 ls ${ARTIFACTS_S3_BUCKET} >/dev/null" >>/etc/rc.local
+    echo "  /usr/bin/s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,del_cache,allow_other,iam_role,curldbg,endpoint=\"${AWS_DEFAULT_REGION}\",url=\"https://s3-${AWS_DEFAULT_REGION}.amazonaws.com\"" >>/etc/rc.local
+    echo "  sleep 2" >>/etc/rc.local
+    echo "  res=\$(df -h | grep '${BUILD_USER_HOME}/artifacts')" >>/etc/rc.local
+    echo "  [ \"\$res\" != \"\" ] && break" >>/etc/rc.local
+    echo "  count=\$((count+1))" >>/etc/rc.local
+    echo "done" >>/etc/rc.local
+
+    chmod +x /etc/rc.local
+    /etc/rc.local
+
     fin system reset
 fi

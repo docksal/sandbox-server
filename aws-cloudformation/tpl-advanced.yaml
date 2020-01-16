@@ -86,6 +86,10 @@ Parameters:
     AllowedValues:
       - false
       - true
+  S3ArtifactsBucketName:
+    Description: "S3 Artifacts bucket name (empty set will generate random name)"
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -100,6 +104,7 @@ Metadata:
           - ExistingEIP
           - ExistingDataVolume
           - EnableS3ArtifactsBucket
+          - S3ArtifactsBucketName
       - Label:
           default: "Github configuration: Optional"
         Parameters:
@@ -136,6 +141,8 @@ Metadata:
         default: "LetsEncrypt configuration"
       EnableS3ArtifactsBucket:
         default: "Enable S3 artifacts bucket"
+      S3ArtifactsBucketName:
+        default: "S3 artifacts bucket name"
 
 Mappings:
   Region2AMI:
@@ -176,12 +183,14 @@ Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
   ArtifactsS3Enabled: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
+  ArtifactsS3BucketNameIsSet: !Not [!Equals [!Ref S3ArtifactsBucketName, ""]]
 
 Resources:
   ArtifactsS3Bucket:
     Type: AWS::S3::Bucket
     Condition: ArtifactsS3Enabled
     Properties:
+      BucketName: !If [ ArtifactsS3BucketNameIsSet, !Ref S3ArtifactsBucketName, !Ref "AWS::NoValue" ]
       LifecycleConfiguration:
         Rules:
           - Id: "DeleteObjectsOlderThanYear"
