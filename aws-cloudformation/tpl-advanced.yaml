@@ -2,6 +2,14 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Sandbox server template (advanced)
 
 Parameters:
+  VpcId:
+    Description: "VpcId where instance will be attached"
+    Type: "AWS::EC2::VPC::Id"
+    Default: ""
+  SubnetId:
+    Description: "SubnetId where instance will be attached"
+    Type: "AWS::EC2::Subnet::Id"
+    Default: ""
   ResourceType:
     Description: "Resource type (default: ec2)"
     Type: String
@@ -105,6 +113,8 @@ Metadata:
           - ExistingDataVolume
           - EnableS3ArtifactsBucket
           - S3ArtifactsBucketName
+          - VpcId
+          - SubnetId
       - Label:
           default: "Github configuration: Optional"
         Parameters:
@@ -117,6 +127,10 @@ Metadata:
           - LetsEncryptDomain
           - LetsEncryptConfig
     ParameterLabels:
+      VpcId:
+        default: "VPC id"
+      SubnetId:
+        default: "Subnet id"
       ResourceType:
         default: "Resource type"
       InstanceType:
@@ -184,6 +198,8 @@ Conditions:
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
   ArtifactsS3Enabled: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
   ArtifactsS3BucketNameIsSet: !Not [!Equals [!Ref S3ArtifactsBucketName, ""]]
+  VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
+  SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
 
 Resources:
   ArtifactsS3Bucket:
@@ -222,6 +238,7 @@ Resources:
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
+      VpcId: !If [ VpcIdDefined, !Ref VpcId, !Ref "AWS::NoValue" ]
       GroupDescription: 'Enable SSH, HTTP, HTTPS'
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -403,6 +420,7 @@ Resources:
               - DeviceName: /dev/sda1
                 Ebs:
                   VolumeSize: '8'
+            SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
             UserData: !Base64
               'Fn::Join':
                 - ''
@@ -427,6 +445,7 @@ Resources:
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: '8'
+      SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
       UserData: !Base64
         'Fn::Join':
           - ''
