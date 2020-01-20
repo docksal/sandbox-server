@@ -308,7 +308,6 @@ then
     echo "count=0" >>/etc/rc.local
     echo "while [ \${count} -lt 5 ]" >>/etc/rc.local
     echo "do" >>/etc/rc.local
-    echo "  aws s3 ls ${ARTIFACTS_S3_BUCKET} >/dev/null" >>/etc/rc.local
     echo "  /usr/bin/s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,del_cache,allow_other,iam_role,curldbg,endpoint=\"${AWS_DEFAULT_REGION}\",url=\"https://s3-${AWS_DEFAULT_REGION}.amazonaws.com\"" >>/etc/rc.local
     echo "  sleep 2" >>/etc/rc.local
     echo "  res=\$(df -h | grep '${BUILD_USER_HOME}/artifacts')" >>/etc/rc.local

@@ -4,11 +4,11 @@ Description: Sandbox server template (advanced)
 Parameters:
   VpcId:
     Description: "VpcId where instance will be attached"
-    Type: "AWS::EC2::VPC::Id"
+    Type: String
     Default: ""
   SubnetId:
-    Description: "SubnetId where instance will be attached"
-    Type: "AWS::EC2::Subnet::Id"
+    Description: "SubnetId where instance will be attached. Should be defined if non default vpc used"
+    Type: String
     Default: ""
   ResourceType:
     Description: "Resource type (default: ec2)"
@@ -438,8 +438,8 @@ Resources:
       Tags:
       - Key: StackId
         Value: !Ref AWS::StackId
-      SecurityGroups:
-        - !Ref InstanceSecurityGroup
+      SecurityGroupIds:
+        - !GetAtt InstanceSecurityGroup.GroupId
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
