@@ -430,6 +430,7 @@ Resources:
               'Fn::Join':
                 - ''
                 - - |
+                # add to the end of init script echo line with template variable values, for recreate instance on every variable change
                   - !Sub
                     - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
                     - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
@@ -459,6 +460,7 @@ Resources:
         'Fn::Join':
           - ''
           - - |
+          # add to the end of init script echo line with template variable values, for recreate instance on every variable change
             - !Sub
               - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
               - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
