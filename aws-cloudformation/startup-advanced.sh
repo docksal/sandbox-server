@@ -98,7 +98,7 @@ export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${ST
 export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsS3Bucket`].OutputValue' --output text)
 
 # attach elastic ip
-[[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
+[[ "${EIP}" != "" ]] && (aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} || true)
 
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
