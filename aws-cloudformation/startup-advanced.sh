@@ -296,8 +296,14 @@ fi
 
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
+    mkdir -p ${BUILD_USER_HOME}/artifacts
     sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
     echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
     chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+    apt-get -y install libgcrypt20 s3fs
+    echo "#!/bin/bash" >/etc/rc.local
+    echo "s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=\"${AWS_DEFAULT_REGION}\",url=\"https://s3-${AWS_DEFAULT_REGION}.amazonaws.com\"" >>/etc/rc.local
+    chmod +x /etc/rc.local
+    /etc/rc.local
     fin system reset
 fi
