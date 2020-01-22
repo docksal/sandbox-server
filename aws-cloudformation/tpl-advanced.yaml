@@ -430,7 +430,10 @@ Resources:
               'Fn::Join':
                 - ''
                 - - |
-                  - !Sub echo ${ExistingEIP}-${ExistingDataVolume}-${EnableS3ArtifactsBucket}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                  - !Sub
+                    - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                    - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
+
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -456,7 +459,9 @@ Resources:
         'Fn::Join':
           - ''
           - - |
-            - !Sub echo ${ExistingEIP}-${ExistingDataVolume}-${EnableS3ArtifactsBucket}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+            - !Sub
+              - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+              - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
 
 Outputs:
   IPAddress:
