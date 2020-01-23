@@ -255,10 +255,10 @@ ln -sf ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
 if [[ ! -d ${MOUNT_POINT}/var/lib/docker ]]; then
     mkdir -p ${MOUNT_POINT}/var/lib/docker
     /etc/init.d/docker stop >/dev/null 2>&1 || true
+else
     rm -rf /var/lib/docker
-    ln -sf ${MOUNT_POINT}/var/lib/docker /var/lib/docker
-    /etc/init.d/docker start >/dev/null 2>&1 || true
 fi
+ln -sf ${MOUNT_POINT}/var/lib/docker /var/lib/docker
 
 # Create the projects/builds directory
 mkdir -p ${PROJECTS_ROOT}
