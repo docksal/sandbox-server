@@ -214,11 +214,13 @@ then
     done
 fi
 
-# start docker daemon after partitions manipulation
-/etc/init.d/docker start >/dev/null 2>&1 || true
-
 # exit if stack not changed
-[[ "${old_stack_md5sum}" == "${stack_md5sum}" ]] && exit 0
+if [[ "${old_stack_md5sum}" == "${stack_md5sum}" ]]
+then
+    # start docker daemon after partitions manipulation
+    /etc/init.d/docker start >/dev/null 2>&1 || true
+    exit 0
+fi
 
 # create mount point directory
 mkdir -p ${MOUNT_POINT}
@@ -254,7 +256,6 @@ ln -sf ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
 # create docker data directory in data directory if does not exists
 if [[ ! -d ${MOUNT_POINT}/var/lib/docker ]]; then
     mkdir -p ${MOUNT_POINT}/var/lib/docker
-    /etc/init.d/docker stop >/dev/null 2>&1 || true
 else
     rm -rf /var/lib/docker
 fi
