@@ -326,7 +326,9 @@ Resources:
             - "cloudformation:DescribeStacks"
             - "ec2:DescribeInstances"
             - "ec2:AttachVolume"
+            - "ec2:DetachVolume"
             - "ec2:AssociateAddress"
+            - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
@@ -375,7 +377,9 @@ Resources:
             - "cloudformation:DescribeStacks"
             - "ec2:DescribeInstances"
             - "ec2:AttachVolume"
+            - "ec2:DetachVolume"
             - "ec2:AssociateAddress"
+            - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
