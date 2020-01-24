@@ -69,6 +69,11 @@ Parameters:
     Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
     Type: String
     Default: ""
+  AccessFrom:
+    Description: |
+      CIDR block to allow ingress access to the instance. Use "0.0.0.0/0" for unrestricted access.
+    Type: String
+    Default: 0.0.0.0/0
   ExistingDataVolume:
     Description: |
       Use an existing EBS volume for instance persistent storage.
@@ -130,6 +135,7 @@ Metadata:
           - VpcId
           - SubnetId
           - ExistingEIP
+          - AccessFrom
       - Label:
           default: "Storage: Optional"
         Parameters:
@@ -162,6 +168,8 @@ Metadata:
         default: "Subnet ID"
       ExistingEIP:
         default: "Elastic IP"
+      AccessFrom:
+        default: "Access from"
       ExistingDataVolume:
         default: "Persistent data volume"
       EnableArtifactsBucket:
@@ -267,15 +275,15 @@ Resources:
         - IpProtocol: tcp
           FromPort: '22'
           ToPort: '22'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
         - IpProtocol: tcp
           FromPort: '80'
           ToPort: '80'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
         - IpProtocol: tcp
           FromPort: '443'
           ToPort: '443'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
 
   FleetRole:
     Type: AWS::IAM::Role
