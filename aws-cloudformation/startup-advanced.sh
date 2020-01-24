@@ -1,3 +1,22 @@
+Content-Type: multipart/mixed; boundary="//"
+MIME-Version: 1.0
+
+--//
+Content-Type: text/cloud-config; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="cloud-config.txt"
+
+#cloud-config
+cloud_final_modules:
+- [scripts-user, always]
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="userdata.txt"
+
 #!/bin/bash
 
 # This is a startup script for a Docksal Sandbox server in GCP.
@@ -19,6 +38,7 @@ DOCKSAL_VERSION="master"
 PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
+ATTACH_VOLUME_AS="/dev/sdp"
 
 ##########
 # Functions begin
@@ -39,11 +59,7 @@ mount_part()
     tune2fs -L ${DISK_LABEL} ${DATA_DISK} >/dev/null 2>&1
     # Mount the data disk
     mkdir -p ${MOUNT_POINT}
-    cp /etc/fstab /etc/fstab.backup
-    # Write disk mount to /etc/fstab (so that it persists on reboots)
-    # Equivalent of `mount /dev/sdb /mnt/data`
-    echo "LABEL=${DISK_LABEL} ${MOUNT_POINT}  ext4  defaults,nofail  0 2" | tee -a /etc/fstab
-    mount -a
+    mount ${DATA_DISK} ${MOUNT_POINT}
 }
 
 create_fs()
@@ -82,50 +98,82 @@ create_part()
 ##########
 # Functions end
 
-apt-get -y update
-apt-get -y install awscli
+# install aws cli if instance just created
+if [[ ! -f /root/stack_last_update ]]
+then
+    apt-get -y update
+    apt-get -y install awscli
+else
+    old_stack_md5sum="$(cat /root/stack_last_update)"
+fi
 
+# read necessary variables
 export AWS_DEFAULT_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/\(.*\)[a-z]/\1/')
 export INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 export STACK_ID=$(aws ec2 describe-instances --instance-id ${INSTANCE_ID} --query 'Reservations[*].Instances[*].Tags[?Key==`StackId`].Value' --output text)
-export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
-export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`PersistentVolume`].OutputValue' --output text)
-export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubToken`].OutputValue' --output text)
-export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubOrgName`].OutputValue' --output text)
-export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`GitHubTeamSlug`].OutputValue' --output text)
-export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptDomain`].OutputValue' --output text)
-export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`LetsEncryptConfig`].OutputValue' --output text)
+export ATTACHED_IP=$(aws ec2 describe-instances --instance-id ${INSTANCE_ID} --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+export ATTACHED_VOLUME=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=${INSTANCE_ID} Name=attachment.device,Values=${ATTACH_VOLUME_AS} --query 'Volumes[*].VolumeId' --output text)
+
+# wait stack status complete
+while true
+do
+  STACK_STATUS=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].StackStatus' --output text)
+  if [[ "${STACK_STATUS}" == *"UPDATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"CREATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"ROLLBACK_COMPLETE"* ]]
+  then
+      stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} | md5sum | cut -d' ' -f1)
+      break
+  fi
+  sleep 5
+done
+
+export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`ExistingEIP`].ParameterValue' --output text)
+export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`ExistingDataVolume`].ParameterValue' --output text)
+export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubToken`].ParameterValue' --output text)
+export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubOrgName`].ParameterValue' --output text)
+export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubTeamSlug`].ParameterValue' --output text)
+export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptDomain`].ParameterValue' --output text)
+export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptConfig`].ParameterValue' --output text)
 export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsS3Bucket`].OutputValue' --output text)
 
-# attach elastic ip
-[[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP}
+# stop docker daemon before partitions manipulation
+/etc/init.d/docker stop >/dev/null 2>&1 || true
+
+# detach attached volume if template volume parameter changed
+if [[ "${ATTACHED_VOLUME}" != "${VOLUME_ID}" ]]
+then
+    umount -f ${MOUNT_POINT} >/dev/null 2>&1 || true
+    aws ec2 detach-volume --volume-id ${ATTACHED_VOLUME} 2>/dev/null || true
+fi
 
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
-    # Wait for EBS volume "available" status before attaching.
-    # When updating a spot stack, the volume may be in use by the previous instance which has not yet been terminated.
-    wait_count=0
-    wait_max_attempts=30
-    while true
-    do
-        let "wait_count+=1"
-        # Check volume status. Non-empty output means volume is available and we can proceed.
-        result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
-        [[ "${result}" != "" ]] && break
+    # check if volume already attached
+    if [[ "${ATTACHED_VOLUME}" != "${VOLUME_ID}" ]]
+    then
+        # Wait for EBS volume "available" status before attaching.
+        # When updating a spot stack, the volume may be in use by the previous instance which has not yet been terminated.
+        wait_count=0
+        wait_max_attempts=30
+        while true
+        do
+            let "wait_count+=1"
+            # Check volume status. Non-empty output means volume is available and we can proceed.
+            result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
+            [[ "${result}" != "" ]] && break
 
-        # Fail if reached maximum attempts
-        if (( ${wait_count} > ${wait_max_attempts} )); then
-            echo "ERROR: Timed out waiting for EBS volume to be available."
-            exit 1
-        fi
+            # Fail if reached maximum attempts
+            if (( ${wait_count} > ${wait_max_attempts} )); then
+                echo "ERROR: Timed out waiting for EBS volume to be available."
+                exit 1
+            fi
 
-        echo "Waiting for EBS volume to become available (${wait_count})..."
-        sleep 10
-    done
-
-    # Attache the EBS volume to the instance
-    aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device /dev/sdp || true
+            echo "Waiting for EBS volume to become available (${wait_count})..."
+            sleep 10
+        done
+        # Attache the EBS volume to the instance
+        aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device ${ATTACH_VOLUME_AS} >/dev/null 2>&1 || true
+    fi
 
     # Wait for data volume attachment to complete
     wait_count=0
@@ -161,6 +209,27 @@ then
     done
 fi
 
+# exit if stack not changed
+if [[ "${old_stack_md5sum}" == "${stack_md5sum}" ]]
+then
+    # start docker daemon after partitions manipulation
+    /etc/init.d/docker start >/dev/null 2>&1 || true
+    exit 0
+fi
+
+# create mount point directory
+mkdir -p ${MOUNT_POINT}
+
+# attach/detach elastic ip
+if [[ "${EIP}" == "" ]]
+then
+    # try to detach attached ip. elastic ip will be detached, but autoassigned ip remain attached
+    aws ec2 disassociate-address --public-ip ${ATTACHED_IP} 2>/dev/null || true
+else
+    # try to attach elastic ip if defined in template. in case user defined wrong ip, instance will be accessible on autoassigned ip
+    aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} 2>/dev/null || true
+fi
+
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
@@ -170,24 +239,22 @@ if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
     echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
 
-if [ -d $MOUNT_POINT ]
-then
-    # Move BUILD_USER_HOME to the data disk
-    # E.g. /home/build-agent => /mnt/data/home/build-agent
-    if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
-        mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
-        mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
-    else
-        rm -rf ${BUILD_USER_HOME}
-    fi
-    ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
-
-    # Symlink /var/lib/docker (should not yet exist when this script runs) to the data volume
-    mkdir -p ${MOUNT_POINT}/var/lib/docker
-    ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker
+# create user home directory in data directory if does not exists and move existing user home directory
+if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
+    mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
+    mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
 else
-    echo "WARNING: data volume not found. Using instance-only storage"
+    rm -rf ${BUILD_USER_HOME}
 fi
+ln -sf ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
+
+# create docker data directory in data directory if does not exists
+if [[ ! -d ${MOUNT_POINT}/var/lib/docker ]]; then
+    mkdir -p ${MOUNT_POINT}/var/lib/docker
+else
+    rm -rf /var/lib/docker
+fi
+ln -sf ${MOUNT_POINT}/var/lib/docker /var/lib/docker
 
 # Create the projects/builds directory
 mkdir -p ${PROJECTS_ROOT}
@@ -296,8 +363,17 @@ fi
 
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
+    mkdir -p ${BUILD_USER_HOME}/artifacts
     sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
     echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
     chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+    apt-get -y install libgcrypt20 s3fs
+    echo "#!/bin/bash" >/etc/rc.local
+    echo "s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=\"${AWS_DEFAULT_REGION}\",url=\"https://s3-${AWS_DEFAULT_REGION}.amazonaws.com\"" >>/etc/rc.local
+    chmod +x /etc/rc.local
+    /etc/rc.local
     fin system reset
 fi
+
+echo "${stack_md5sum}" >/root/stack_last_update
+

@@ -23,5 +23,9 @@ install:
 script:
   - cd aws-cloudformation && ./scripts/bash2yaml startup-${TEMPLATE_TYPE}.sh tpl-${TEMPLATE_TYPE}.yaml
   - mkdir -p ${LOCAL_DIR} && mv -f template.yaml ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml
-  - aws cloudformation validate-template --region ${AWS_REGION} --template-body file://${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml
+  - tmp=$(mktemp) && cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml ${tmp}
+  - aws s3 cp ${tmp} s3://${S3_BUCKET}/$(basename ${tmp}) --acl public-read
+  - res=$(aws cloudformation validate-template --region ${AWS_REGION} --template-url https://${S3_BUCKET}.s3.amazonaws.com/$(basename ${tmp}) || echo "error")
+  - aws s3 rm s3://${S3_BUCKET}/$(basename ${tmp})
+  - if [ "${res}" == "error" ]; then exit 1; fi
   - ${TRAVIS_BUILD_DIR}/scripts/upload-to-s3.sh

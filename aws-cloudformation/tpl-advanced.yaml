@@ -2,6 +2,14 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Sandbox server template (advanced)
 
 Parameters:
+  VpcId:
+    Description: "VpcId where instance will be attached"
+    Type: String
+    Default: ""
+  SubnetId:
+    Description: "Public subnet id where instance will be attached (must be defined if non default vpc used). Must be located in the same availability zone where new instance will be created"
+    Type: String
+    Default: ""
   ResourceType:
     Description: "Resource type (default: ec2)"
     Type: String
@@ -48,11 +56,12 @@ Parameters:
     Default: ""
   ExistingDataVolume:
     Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
-    Type: "AWS::EC2::Volume::Id"
+    # Type: "AWS::EC2::Volume::Id"
+    Type: String
+    Default: ""
   ManualAZ:
-    Description: "Manually set instance availability zone (default: us-east-2a)"
+    Description: "Set instance availability zone"
     Type: AWS::EC2::AvailabilityZone::Name
-    Default: "us-east-2a"
   GitHubToken:
     Description: "Github token with read:org access level"
     Type: String
@@ -86,6 +95,10 @@ Parameters:
     AllowedValues:
       - false
       - true
+  S3ArtifactsBucketName:
+    Description: "Create artifacts S3 bucket with name (empty set will create s3 bucket with random name)"
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -97,9 +110,15 @@ Metadata:
           - InstanceType
           - KeyName
           - ManualAZ
+      - Label:
+          default: "Basic: Optional"
+        Parameters:
           - ExistingEIP
           - ExistingDataVolume
           - EnableS3ArtifactsBucket
+          - S3ArtifactsBucketName
+          - VpcId
+          - SubnetId
       - Label:
           default: "Github configuration: Optional"
         Parameters:
@@ -112,6 +131,10 @@ Metadata:
           - LetsEncryptDomain
           - LetsEncryptConfig
     ParameterLabels:
+      VpcId:
+        default: "VPC id"
+      SubnetId:
+        default: "Subnet id"
       ResourceType:
         default: "Resource type"
       InstanceType:
@@ -136,6 +159,8 @@ Metadata:
         default: "LetsEncrypt configuration"
       EnableS3ArtifactsBucket:
         default: "Enable S3 artifacts bucket"
+      S3ArtifactsBucketName:
+        default: "S3 artifacts bucket name"
 
 Mappings:
   Region2AMI:
@@ -176,12 +201,17 @@ Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
   ArtifactsS3Enabled: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
+  ArtifactsBucketNameDefined: !Not [!Equals [!Ref S3ArtifactsBucketName, ""]]
+  VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
+  SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
+  ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
 
 Resources:
   ArtifactsS3Bucket:
     Type: AWS::S3::Bucket
     Condition: ArtifactsS3Enabled
     Properties:
+      BucketName: !If [ ArtifactsBucketNameDefined, !Ref S3ArtifactsBucketName, !Ref "AWS::NoValue" ]
       LifecycleConfiguration:
         Rules:
           - Id: "DeleteObjectsOlderThanYear"
@@ -190,6 +220,7 @@ Resources:
 
   ArtifactsBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Condition: ArtifactsS3Enabled
     DependsOn: ArtifactsS3Bucket
     Properties:
       Bucket: !Ref ArtifactsS3Bucket
@@ -213,6 +244,7 @@ Resources:
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
+      VpcId: !If [ VpcIdDefined, !Ref VpcId, !Ref "AWS::NoValue" ]
       GroupDescription: 'Enable SSH, HTTP, HTTPS'
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -294,7 +326,9 @@ Resources:
             - "cloudformation:DescribeStacks"
             - "ec2:DescribeInstances"
             - "ec2:AttachVolume"
+            - "ec2:DetachVolume"
             - "ec2:AssociateAddress"
+            - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
@@ -343,7 +377,9 @@ Resources:
             - "cloudformation:DescribeStacks"
             - "ec2:DescribeInstances"
             - "ec2:AttachVolume"
+            - "ec2:DetachVolume"
             - "ec2:AssociateAddress"
+            - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
@@ -394,10 +430,15 @@ Resources:
               - DeviceName: /dev/sda1
                 Ebs:
                   VolumeSize: '8'
+            SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
             UserData: !Base64
               'Fn::Join':
                 - ''
                 - - |
+                # add to the end of init script echo line with template variable values, for recreate instance on every variable change
+                  - !Sub
+                    - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                    - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -411,21 +452,27 @@ Resources:
       Tags:
       - Key: StackId
         Value: !Ref AWS::StackId
-      SecurityGroups:
-        - !Ref InstanceSecurityGroup
+      SecurityGroupIds:
+        - !GetAtt InstanceSecurityGroup.GroupId
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: '8'
+      SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
       UserData: !Base64
         'Fn::Join':
           - ''
           - - |
+          # add to the end of init script echo line with template variable values, for recreate instance on every variable change
+            - !Sub
+              - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+              - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
 
 Outputs:
   IPAddress:
-    Value: !Ref ExistingEIP
+    Description: IP can be found in instance parameters using UI, if not shown here
+    Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
   PersistentVolume:
     Value: !Ref ExistingDataVolume
   GitHubToken:
@@ -439,6 +486,6 @@ Outputs:
   LetsEncryptConfig:
     Value: !Ref LetsEncryptConfig
   ArtifactsS3Bucket:
-    Value: !Ref ArtifactsS3Bucket
+    Value: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
