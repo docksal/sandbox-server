@@ -2,23 +2,22 @@ AWSTemplateFormatVersion: 2010-09-09
 Description: Sandbox server template (advanced)
 
 Parameters:
-  VpcId:
-    Description: "VpcId where instance will be attached"
-    Type: String
-    Default: ""
-  SubnetId:
-    Description: "Public subnet id where instance will be attached (must be defined if non default vpc used). Must be located in the same availability zone where new instance will be created"
-    Type: String
-    Default: ""
   ResourceType:
-    Description: "Resource type (default: ec2)"
+    Description: |
+      EC2 resource type.
+      Use "ec2" (on-demand) for guaranteed server uptime.
+      Use "spot" to save up to 80% of EC2 costs, if an accasional (once in a few months) instance downtime
+      of 5-10 minutes is acceptible.
+      Make sure to configure a presistent data volume to avoid data loss in spot mode (see below).
     Type: String
     Default: ec2
     AllowedValues:
       - ec2
       - spot
   InstanceType:
-    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
+    Description: |
+      EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
+      Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
     Type: String
     # Instances with < 2GB RAM should only be used for testing the CloudFormation template
     # t3.small: 2 vCPU, 2GB RAM
@@ -50,18 +49,33 @@ Parameters:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
     ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
-  ExistingEIP:
-    Description: "Use an existing Elastic IP for the instance"
-    Type: String
-    Default: ""
-  ExistingDataVolume:
-    Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
-    # Type: "AWS::EC2::Volume::Id"
-    Type: String
-    Default: ""
   ManualAZ:
     Description: "Set instance availability zone"
     Type: AWS::EC2::AvailabilityZone::Name
+  VpcId:
+    Description: |
+      VPC must have internet access (with Internet Gateway or Virtual Private Gateway)
+      Leave empty to use the default VPC
+    Type: String
+    Default: ""
+  SubnetId:
+    Description: |
+      Public subnet ID within the non-default VPC.
+      Must be located in the same AZ where the instance is created.
+      Required if using non-default VPC.
+    Type: String
+    Default: ""
+  ExistingEIP:
+    Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
+    Type: String
+    Default: ""
+  ExistingDataVolume:
+    Description: |
+      Use an existing EBS volume for instance persistent storage.
+      Must be located in the same AZ where the instance is created.
+    # Type: "AWS::EC2::Volume::Id"
+    Type: String
+    Default: ""
   GitHubToken:
     Description: "Github token with read:org access level"
     Type: String
@@ -76,27 +90,27 @@ Parameters:
     Default: ""
   LetsEncryptDomain:
     Description: |
-      Domain name for which the SSL certificate will be issued.
+      Domain name for which the SSL certificate will be issued. 
       Example: for "example.com" an SNI wildcard cert will be issue covering both "example.com" and "*.example.com".
     Type: String
     Default: ""
   LetsEncryptConfig:
     Description: |
-      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs).
-      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi
-      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key"
+      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs). 
+      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi. 
+      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key". 
       Note: Leave empty if the domain is managed in AWS Route53 in the same account.
     Type: String
     Default: ""
-  EnableS3ArtifactsBucket:
-    Description: "Enable S3 artifacts bucket (default: false)"
+  EnableArtifactsBucket:
+    Description: "Enable S3 artifacts bucket"
     Type: String
     Default: false
     AllowedValues:
       - false
       - true
-  S3ArtifactsBucketName:
-    Description: "Create artifacts S3 bucket with name (empty set will create s3 bucket with random name)"
+  ArtifactsBucketName:
+    Description: "Set name for the artifacts bucket. Leave empty to have the bucket name automatically generated."
     Type: String
     Default: ""
 
@@ -111,42 +125,49 @@ Metadata:
           - KeyName
           - ManualAZ
       - Label:
-          default: "Basic: Optional"
+          default: "VPC/Network: Optional"
         Parameters:
-          - ExistingEIP
-          - ExistingDataVolume
-          - EnableS3ArtifactsBucket
-          - S3ArtifactsBucketName
           - VpcId
           - SubnetId
+          - ExistingEIP
       - Label:
-          default: "Github configuration: Optional"
+          default: "Storage: Optional"
+        Parameters:
+          - ExistingDataVolume
+          - EnableArtifactsBucket
+          - ArtifactsBucketName
+      - Label:
+          default: "Github settings: Optional"
         Parameters:
           - GitHubToken
           - GitHubOrgName
           - GitHubTeamSlug
       - Label:
-          default: "LetsEncrypt configuration: Optional"
+          default: "LetsEncrypt settings: Optional"
         Parameters:
           - LetsEncryptDomain
           - LetsEncryptConfig
     ParameterLabels:
-      VpcId:
-        default: "VPC id"
-      SubnetId:
-        default: "Subnet id"
       ResourceType:
         default: "Resource type"
       InstanceType:
         default: "Instance type"
       KeyName:
         default: "SSH key"
+      ManualAZ:
+        default: "Availability zone"
+      VpcId:
+        default: "VPC ID"
+      SubnetId:
+        default: "Subnet ID"
       ExistingEIP:
         default: "Elastic IP"
       ExistingDataVolume:
         default: "Persistent data volume"
-      ManualAZ:
-        default: "Availability zone"
+      EnableArtifactsBucket:
+        default: "Enable artifacts bucket"
+      ArtifactsBucketName:
+        default: "Artifacts bucket name"
       GitHubToken:
         default: "Github token"
       GitHubOrgName:
@@ -157,10 +178,6 @@ Metadata:
         default: "Sandbox domain name"
       LetsEncryptConfig:
         default: "LetsEncrypt configuration"
-      EnableS3ArtifactsBucket:
-        default: "Enable S3 artifacts bucket"
-      S3ArtifactsBucketName:
-        default: "S3 artifacts bucket name"
 
 Mappings:
   Region2AMI:
@@ -200,18 +217,18 @@ Mappings:
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
-  ArtifactsS3Enabled: !Equals [!Ref EnableS3ArtifactsBucket, "true"]
-  ArtifactsBucketNameDefined: !Not [!Equals [!Ref S3ArtifactsBucketName, ""]]
+  ArtifactsEnabled: !Equals [!Ref EnableArtifactsBucket, "true"]
+  ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
   ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
 
 Resources:
-  ArtifactsS3Bucket:
+  ArtifactsBucket:
     Type: AWS::S3::Bucket
-    Condition: ArtifactsS3Enabled
+    Condition: ArtifactsEnabled
     Properties:
-      BucketName: !If [ ArtifactsBucketNameDefined, !Ref S3ArtifactsBucketName, !Ref "AWS::NoValue" ]
+      BucketName: !If [ ArtifactsBucketNameDefined, !Ref ArtifactsBucketName, !Ref "AWS::NoValue" ]
       LifecycleConfiguration:
         Rules:
           - Id: "DeleteObjectsOlderThanYear"
@@ -220,10 +237,10 @@ Resources:
 
   ArtifactsBucketPolicy:
     Type: AWS::S3::BucketPolicy
-    Condition: ArtifactsS3Enabled
-    DependsOn: ArtifactsS3Bucket
+    Condition: ArtifactsEnabled
+    DependsOn: ArtifactsBucket
     Properties:
-      Bucket: !Ref ArtifactsS3Bucket
+      Bucket: !Ref ArtifactsBucket
       PolicyDocument:
         Statement:
           - Sid: AllowReadWriteAcces
@@ -238,8 +255,8 @@ Resources:
               - s3:Get*
               - s3:*Object*
             Resource:
-              - !Sub arn:aws:s3:::${ArtifactsS3Bucket}
-              - !Sub arn:aws:s3:::${ArtifactsS3Bucket}/*
+              - !Sub arn:aws:s3:::${ArtifactsBucket}
+              - !Sub arn:aws:s3:::${ArtifactsBucket}/*
 
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -438,7 +455,7 @@ Resources:
                 # add to the end of init script echo line with template variable values, for recreate instance on every variable change
                   - !Sub
                     - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
-                    - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
+                    - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -467,14 +484,21 @@ Resources:
           # add to the end of init script echo line with template variable values, for recreate instance on every variable change
             - !Sub
               - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
-              - s3name: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
+              - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
 
 Outputs:
   IPAddress:
-    Description: IP can be found in instance parameters using UI, if not shown here
+    Description: If not shown here, IP can be found in EC2 dashbaord under instance details
     Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
+  InstanceURL:
+    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
+  SSHConnect:
+    Description: SSH connection string
+    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ] ] ] ]
   PersistentVolume:
     Value: !Ref ExistingDataVolume
+  ArtifactsBucket:
+    Value: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
   GitHubToken:
     Value: !Ref GitHubToken
   GitHubOrgName:
@@ -485,7 +509,3 @@ Outputs:
     Value: !Ref LetsEncryptDomain
   LetsEncryptConfig:
     Value: !Ref LetsEncryptConfig
-  ArtifactsS3Bucket:
-    Value: !If [ ArtifactsS3Enabled, !Ref ArtifactsS3Bucket, "" ]
-  InstanceURL:
-    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
