@@ -60,11 +60,6 @@ mount_part()
     # Mount the data disk
     mkdir -p ${MOUNT_POINT}
     mount ${DATA_DISK} ${MOUNT_POINT}
-    #cp /etc/fstab /etc/fstab.backup
-    # Write disk mount to /etc/fstab (so that it persists on reboots)
-    # Equivalent of `mount /dev/sdb /mnt/data`
-    #echo "LABEL=${DISK_LABEL} ${MOUNT_POINT} ext4 defaults,nofail 0 2" | tee -a /etc/fstab
-    #mount -a
 }
 
 create_fs()
