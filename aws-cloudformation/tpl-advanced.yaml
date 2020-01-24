@@ -496,7 +496,7 @@ Resources:
 
 Outputs:
   IPAddress:
-    Description: If not shown here, IP can be found in EC2 dashbaord under instance details
+    Description: If not shown here, IP can be found in EC2 dashboard under instance details
     Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
   InstanceURL:
     Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
