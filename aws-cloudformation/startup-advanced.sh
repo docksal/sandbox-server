@@ -133,7 +133,7 @@ export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK
 export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubTeamSlug`].ParameterValue' --output text)
 export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptDomain`].ParameterValue' --output text)
 export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptConfig`].ParameterValue' --output text)
-export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsS3Bucket`].OutputValue' --output text)
+export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsBucket`].OutputValue' --output text)
 
 # stop docker daemon before partitions manipulation
 /etc/init.d/docker stop >/dev/null 2>&1 || true
