@@ -42,6 +42,31 @@ ATTACH_VOLUME_AS="/dev/sdp"
 
 ##########
 # Functions begin
+wait_volume_status()
+{
+    # Wait for EBS volume status.
+    local volume=$1
+    local status=$2
+    local wait_count=0
+    local wait_max_attempts=30
+    while true
+    do
+        let "wait_count+=1"
+        # Check volume status. Non-empty output means volume is available and we can proceed.
+        result=$(aws ec2 describe-volumes --volume-ids ${volume} --filters "Name=status,Values=${status}" --output text)
+        [[ "${result}" != "" ]] && break
+
+        # Fail if reached maximum attempts
+        if (( ${wait_count} > ${wait_max_attempts} )); then
+            echo "ERROR: Timed out waiting for EBS volume to be ${status}."
+            exit 1
+        fi
+
+        echo "Waiting for EBS volume to become available (${wait_count})..."
+        sleep 10
+    done
+}
+
 reread_device()
 {
     DEVICE=$1
@@ -136,45 +161,35 @@ export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${ST
 export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsBucket`].OutputValue' --output text)
 
 # stop docker daemon before partitions manipulation
-/etc/init.d/docker stop >/dev/null 2>&1 || true
+service docker stop || true
 
 # detach attached volume if template volume parameter changed
 if [[ "${ATTACHED_VOLUME}" != "${VOLUME_ID}" ]]
 then
-    umount -f ${MOUNT_POINT} >/dev/null 2>&1 || true
-    aws ec2 detach-volume --volume-id ${ATTACHED_VOLUME} 2>/dev/null || true
+    if [[ "${ATTACHED_VOLUME}" != "" ]]
+    then
+        aws ec2 detach-volume --volume-id ${ATTACHED_VOLUME} || true
+        [[ "${VOLUME_ID}" != "" ]] && wait_volume_status ${ATTACHED_VOLUME} "available"
+    fi
+    if [[ "${VOLUME_ID}" != "" ]]
+    then
+        aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device ${ATTACH_VOLUME_AS} || true
+        wait_volume_status ${VOLUME_ID} "in-use"
+    fi
+fi
+
+# Create build-agent user with no-password sudo access
+# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
+# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
+if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
+    adduser --disabled-password --home ${DATA_BUILD_USER_HOME} --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
+    usermod -aG sudo ${BUILD_USER}
+    echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
 
 # attach volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
-    # check if volume already attached
-    if [[ "${ATTACHED_VOLUME}" != "${VOLUME_ID}" ]]
-    then
-        # Wait for EBS volume "available" status before attaching.
-        # When updating a spot stack, the volume may be in use by the previous instance which has not yet been terminated.
-        wait_count=0
-        wait_max_attempts=30
-        while true
-        do
-            let "wait_count+=1"
-            # Check volume status. Non-empty output means volume is available and we can proceed.
-            result=$(aws ec2 describe-volumes --volume-ids ${VOLUME_ID} --filters "Name=status,Values=available" --output text)
-            [[ "${result}" != "" ]] && break
-
-            # Fail if reached maximum attempts
-            if (( ${wait_count} > ${wait_max_attempts} )); then
-                echo "ERROR: Timed out waiting for EBS volume to be available."
-                exit 1
-            fi
-
-            echo "Waiting for EBS volume to become available (${wait_count})..."
-            sleep 10
-        done
-        # Attache the EBS volume to the instance
-        aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device ${ATTACH_VOLUME_AS} >/dev/null 2>&1 || true
-    fi
-
     # Wait for data volume attachment to complete
     wait_count=0
     wait_max_attempts=6
@@ -209,58 +224,31 @@ then
     done
 fi
 
-# exit if stack not changed
-if [[ "${old_stack_md5sum}" == "${stack_md5sum}" ]]
-then
-    # start docker daemon after partitions manipulation
-    /etc/init.d/docker start >/dev/null 2>&1 || true
-    exit 0
-fi
-
-# create mount point directory
-mkdir -p ${MOUNT_POINT}
-
 # attach/detach elastic ip
-if [[ "${EIP}" == "" ]]
+if [[ "${EIP}" != "${ATTACHED_IP}" ]]
 then
     # try to detach attached ip. elastic ip will be detached, but autoassigned ip remain attached
     aws ec2 disassociate-address --public-ip ${ATTACHED_IP} 2>/dev/null || true
-else
     # try to attach elastic ip if defined in template. in case user defined wrong ip, instance will be accessible on autoassigned ip
-    aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} 2>/dev/null || true
+    [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} 2>/dev/null || true
 fi
 
-# Create build-agent user with no-password sudo access
-# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
-# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
-if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
-    adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
-    usermod -aG sudo ${BUILD_USER}
-    echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
-fi
-
-# create user home directory in data directory if does not exists and move existing user home directory
+# move existing user home directory to /data
 if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
     mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
-    mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME})
-else
-    rm -rf ${BUILD_USER_HOME}
+    [[ -d ${BUILD_USER_HOME} ]] && [[ ! -L ${BUILD_USER_HOME} ]] && mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME}) || cp -a /etc/skel/. ${DATA_BUILD_USER_HOME}
 fi
-ln -sf ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
+rm -rf ${BUILD_USER_HOME} && ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
 
-# create docker data directory in data directory if does not exists
+# create docker directory in /data if does not exists
 if [[ ! -d ${MOUNT_POINT}/var/lib/docker ]]; then
     mkdir -p ${MOUNT_POINT}/var/lib/docker
-else
-    rm -rf /var/lib/docker
+    [[ -d /var/lib/docker ]] && [[ ! -L /var/lib/docker ]] && mv /var/lib/docker ${MOUNT_POINT}/var/lib/
 fi
-ln -sf ${MOUNT_POINT}/var/lib/docker /var/lib/docker
+rm -rf /var/lib/docker && ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker
 
-# Create the projects/builds directory
-mkdir -p ${PROJECTS_ROOT}
-
-# SSH settings: ensure ~/.ssh exists for the build user
-mkdir -p ${BUILD_USER_HOME}/.ssh
+# Create the projects/builds directory, SSH settings: ensure ~/.ssh exists for the build user
+mkdir -p ${PROJECTS_ROOT} ${BUILD_USER_HOME}/.ssh
 
 # SSH settings: authorized_keys
 # If ~/.ssh/authorized_keys does not exist for the build user, reuse the one from the default user account (ubuntu)
@@ -294,21 +282,32 @@ EOF
 	#chown ${BUILD_USER}:${BUILD_USER} ${BUILD_USER_HOME}/.docksal/docksal.env
 fi
 
-# Fix permissions, since we are running as root here
-# Trailing slash in necessary here, since BUILD_USER_HOME is a symlink
-chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+# start docker daemon after partitions manipulation
+service docker start || true
 
-# Unlock updates
-# Necessary with existing installations (persistent data disk)
-sed -i '/DOCKSAL_LOCK_UPDATES/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+# update/install docksal with new or updated stack
+if [[ "${old_stack_md5sum}" != "${stack_md5sum}" ]]
+then
+    # Fix permissions, since we are running as root here
+    # Trailing slash in necessary here, since BUILD_USER_HOME is a symlink
+    chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
 
-# Install/update Docksal and dependencies
-su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOCKSAL_VERSION} bash"
+    # Unlock updates
+    # Necessary with existing installations (persistent data disk)
+    sed -i '/DOCKSAL_LOCK_UPDATES/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
 
-# Lock updates (protect against unintentional updates in builds)
-echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+    # Install/update Docksal and dependencies
+    su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOCKSAL_VERSION} bash"
 
-if [[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]]
+    # Lock updates (protect against unintentional updates in builds)
+    echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+
+    # disable docker autostart
+    systemctl disable docker.service
+    systemctl disable docker.socket
+fi
+
+if [[ "${GITHUB_TOKEN}" != "" ]] && [[ "${GITHUB_ORG_NAME}" != "" ]] && [[ "${GITHUB_TEAM_SLUG}" != "" ]] && [[ "${old_stack_md5sum}" != "${stack_md5sum}" ]]
 then
     BACKUP_SSH_PUBLIC_KEY="$(curl -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key)"
     # TODO: move ssh-rake script to separate repo
@@ -321,59 +320,63 @@ then
     /usr/local/bin/ssh-rake install
 fi
 
-if [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
+if [[ "${old_stack_md5sum}" != "${stack_md5sum}" ]]
 then
-    ACMESH_CONTAINER="docksal-acme.sh"
-    ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
-    CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
-    DSP="${DSP:-dns_aws}"
-
-    tmp=$(mktemp)
-    printenv >${tmp}
-    eval "export ${LETSENCRYPT_CONFIG}"
-    printenv | diff -u "${tmp}" - | grep -E "^\+\w+" | sed 's/^+//' >env.file
-    
-    docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
-    docker run -d --restart always \
-        --env-file env.file \
-        --name ${ACMESH_CONTAINER} \
-        -v ${CERTOUT_PATH}:/out \
-        neilpang/acme.sh daemon
-
-    rm -f "${tmp}" env.file
-
-    docker exec ${ACMESH_CONTAINER} \
-        --issue \
-        --keylength 4096 \
-        --dns ${DSP} \
-        --domain "${LETSENCRYPT_DOMAIN}" \
-        --domain "*.${LETSENCRYPT_DOMAIN}" \
-        --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
-        --key-file /out/${LETSENCRYPT_DOMAIN}.key \
-        --log /proc/1/fd/1
-
-    if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
+    if [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
     then
-        sed -i '/DOCKSAL_VHOST_PROXY_DEFAULT_CERT/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
-        echo DOCKSAL_VHOST_PROXY_DEFAULT_CERT=\"${LETSENCRYPT_DOMAIN}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
-        chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
-        fin system reset
+        ACMESH_CONTAINER="docksal-acme.sh"
+        ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
+        CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
+        DSP="${DSP:-dns_aws}"
+
+        tmp=$(mktemp)
+        printenv >${tmp}
+        eval "export ${LETSENCRYPT_CONFIG}"
+        printenv | diff -u "${tmp}" - | grep -E "^\+\w+" | sed 's/^+//' >env.file
+        
+        docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
+        docker run -d --restart always \
+            --env-file env.file \
+            --name ${ACMESH_CONTAINER} \
+            -v ${CERTOUT_PATH}:/out \
+            neilpang/acme.sh daemon
+
+        rm -f "${tmp}" env.file
+
+        docker exec ${ACMESH_CONTAINER} \
+            --issue \
+            --keylength 4096 \
+            --dns ${DSP} \
+            --domain "${LETSENCRYPT_DOMAIN}" \
+            --domain "*.${LETSENCRYPT_DOMAIN}" \
+            --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
+            --key-file /out/${LETSENCRYPT_DOMAIN}.key \
+            --log /proc/1/fd/1
+
+        if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
+        then
+            sed -i '/DOCKSAL_VHOST_PROXY_DEFAULT_CERT/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+            echo DOCKSAL_VHOST_PROXY_DEFAULT_CERT=\"${LETSENCRYPT_DOMAIN}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+            chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
+        fi
+    else
+        ACMESH_CONTAINER="docksal-acme.sh"
+        docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
     fi
 fi
 
+# prepare directory for artifacts
+mkdir -p ${BUILD_USER_HOME}/artifacts
+sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
+echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/artifacts"
+
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
-    mkdir -p ${BUILD_USER_HOME}/artifacts
-    sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
-    echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
-    chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
     apt-get -y install libgcrypt20 s3fs
-    echo "#!/bin/bash" >/etc/rc.local
-    echo "s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=\"${AWS_DEFAULT_REGION}\",url=\"https://s3-${AWS_DEFAULT_REGION}.amazonaws.com\"" >>/etc/rc.local
-    chmod +x /etc/rc.local
-    /etc/rc.local
-    fin system reset
+    s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=${AWS_DEFAULT_REGION},url=https://s3-${AWS_DEFAULT_REGION}.amazonaws.com
 fi
 
+su - build-agent -c "fin system reset"
 echo "${stack_md5sum}" >/root/stack_last_update
 
