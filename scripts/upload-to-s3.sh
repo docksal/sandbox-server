@@ -33,6 +33,7 @@ VERSION_HOTFIX=${ver_arr[2]}  # "2.7.0" => "0"
 EDGE_UPLOAD_DIR=${UPLOAD_DIR}/edge
 STABLE_UPLOAD_DIR=${UPLOAD_DIR}/stable
 RELEASE_UPLOAD_DIR=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}
+BRANCH_UPLOAD_DIR=${UPLOAD_DIR}/branch/${TRAVIS_BRANCH}
 
 # Skip pull request
 is_pr && exit 0
@@ -46,6 +47,6 @@ elif is_release; then
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}.${VERSION_HOTFIX}/${TEMPLATE_TYPE}.yaml --acl public-read
 else
-	# Exit if not on develop, master or release tag
-	exit 0
+	# upload templates for every branch
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${BRANCH_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
 fi
