@@ -380,7 +380,7 @@ chown ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/artifacts"
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
     apt-get -y install libgcrypt20 s3fs
-    s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=${AWS_DEFAULT_REGION},url=https://s3-${AWS_DEFAULT_REGION}.amazonaws.com
+    s3fs ${ARTIFACTS_S3_BUCKET} ${BUILD_USER_HOME}/artifacts -o nonempty,allow_other,iam_role,curldbg,endpoint=${AWS_DEFAULT_REGION},url=https://s3.${AWS_DEFAULT_REGION}.amazonaws.com
 fi
 
 su - build-agent -c "fin system reset"
