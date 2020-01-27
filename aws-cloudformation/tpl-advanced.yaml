@@ -230,6 +230,9 @@ Conditions:
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
   ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
+  Route53Defined: !And
+    - !Not [!Equals [!Ref LetsEncryptDomain, ""]]
+    - !Equals [!Ref LetsEncryptConfig, ""]
 
 Resources:
   ArtifactsBucket:
@@ -338,9 +341,8 @@ Resources:
           - sts:AssumeRole
       Path: "/"
 
-  ec2InstancePolicies:
+  rootInstancePolicies:
     Type: AWS::IAM::Policy
-    Condition: CreateEC2
     Properties:
       PolicyName: root
       PolicyDocument:
@@ -355,6 +357,21 @@ Resources:
             - "ec2:AssociateAddress"
             - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
+          Resource: "*"
+      Roles:
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
+
+  route53InstancePolicies:
+    Type: AWS::IAM::Policy
+    Condition: Route53Defined
+    Properties:
+      PolicyName: route53
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
             - "route53:ListHostedZones"
@@ -364,7 +381,8 @@ Resources:
             - "route53:ListHostedZonesByName"
           Resource: "*"
       Roles:
-        - !Ref ec2InstanceRole
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
 
   ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -388,34 +406,6 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: "/"
-
-  spotInstancePolicies:
-    Type: AWS::IAM::Policy
-    Condition: CreateSpot
-    Properties:
-      PolicyName: root
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Action:
-            - "cloudformation:DescribeStacks"
-            - "ec2:DescribeInstances"
-            - "ec2:AttachVolume"
-            - "ec2:DetachVolume"
-            - "ec2:AssociateAddress"
-            - "ec2:DisassociateAddress"
-            - "ec2:DescribeVolumes"
-            # Permissions necessary for TXT record updates in Route53
-            - "route53:GetHostedZone"
-            - "route53:ListHostedZones"
-            - "route53:ChangeResourceRecordSets"
-            - "route53:ListResourceRecordSets"
-            - "route53:GetHostedZoneCount"
-            - "route53:ListHostedZonesByName"
-          Resource: "*"
-      Roles:
-        - !Ref spotInstanceRole
 
   spotInstanceProfile:
     Type: AWS::IAM::InstanceProfile
