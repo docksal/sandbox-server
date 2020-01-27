@@ -3,14 +3,21 @@ Description: Sandbox server template (advanced)
 
 Parameters:
   ResourceType:
-    Description: "Resource type (default: ec2)"
+    Description: |
+      EC2 resource type.
+      Use "ec2" (on-demand) for guaranteed server uptime.
+      Use "spot" to save up to 90% of EC2 costs, if an occasional (once in a few months) instance downtime
+      of 5-10 minutes is acceptable.
+      Make sure to configure a persistent data volume to avoid data loss in spot mode (see below).
     Type: String
     Default: ec2
     AllowedValues:
       - ec2
       - spot
   InstanceType:
-    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
+    Description: |
+      EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
+      Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
     Type: String
     # Instances with < 2GB RAM should only be used for testing the CloudFormation template
     # t3.small: 2 vCPU, 2GB RAM
@@ -42,17 +49,38 @@ Parameters:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
     ConstraintDescription: "Must be the name of an existing EC2 KeyPair"
-  ExistingEIP:
-    Description: "Use an existing Elastic IP for the instance"
+  ManualAZ:
+    Description: "Set instance availability zone"
+    Type: AWS::EC2::AvailabilityZone::Name
+  VpcId:
+    Description: |
+      VPC must have internet access (with Internet Gateway or Virtual Private Gateway)
+      Leave empty to use the default VPC
     Type: String
     Default: ""
+  SubnetId:
+    Description: |
+      Public subnet ID within the non-default VPC.
+      Must be located in the same AZ where the instance is created.
+      Required if using non-default VPC.
+    Type: String
+    Default: ""
+  ExistingEIP:
+    Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
+    Type: String
+    Default: ""
+  AccessFrom:
+    Description: |
+      CIDR block to allow ingress access to the instance. Use "0.0.0.0/0" for unrestricted access.
+    Type: String
+    Default: 0.0.0.0/0
   ExistingDataVolume:
-    Description: "Use an existing EBS volume for instance persistent storage. Must be located in the same availability zone where new instance will be created"
-    Type: "AWS::EC2::Volume::Id"
-  ManualAZ:
-    Description: "Manually set instance availability zone (default: us-east-2a)"
-    Type: AWS::EC2::AvailabilityZone::Name
-    Default: "us-east-2a"
+    Description: |
+      Use an existing EBS volume for instance persistent storage.
+      Must be located in the same AZ where the instance is created.
+    # Type: "AWS::EC2::Volume::Id"
+    Type: String
+    Default: ""
   GitHubToken:
     Description: "Github token with read:org access level"
     Type: String
@@ -67,16 +95,28 @@ Parameters:
     Default: ""
   LetsEncryptDomain:
     Description: |
-      Domain name for which the SSL certificate will be issued.
-      Example: for "example.com" an SNI wildcard cert will be issue covering both "example.com" and "*.example.com".
+      Domain name for which a wildcard LetsEncrypt certificate will be issued.
+      Example: for "example.com", an SNI wildcard cert will be issued covering both "example.com" and "*.example.com".
     Type: String
     Default: ""
   LetsEncryptConfig:
     Description: |
-      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs).
-      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi
-      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key"
-      Note: Leave empty if the domain is managed in AWS Route53 in the same account.
+      Configuration for automated LetsEncrypt certificate provisioning (space delimited variable="value" pairs).
+      Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi. 
+      Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key". 
+      Note: If the domain is managed in AWS Route53 in the same AWS account, then leave this field empty to give the EC2
+      instance the necessary permissions to managed TXT records in Route53.
+    Type: String
+    Default: ""
+  EnableArtifactsBucket:
+    Description: "Enable S3 artifacts bucket"
+    Type: String
+    Default: false
+    AllowedValues:
+      - false
+      - true
+  ArtifactsBucketName:
+    Description: "Set name for the artifacts bucket. Leave empty to have the bucket name automatically generated."
     Type: String
     Default: ""
 
@@ -90,16 +130,27 @@ Metadata:
           - InstanceType
           - KeyName
           - ManualAZ
-          - ExistingEIP
-          - ExistingDataVolume
       - Label:
-          default: "Github configuration: Optional"
+          default: "VPC/Network: Optional"
+        Parameters:
+          - VpcId
+          - SubnetId
+          - ExistingEIP
+          - AccessFrom
+      - Label:
+          default: "Storage: Optional"
+        Parameters:
+          - ExistingDataVolume
+          - EnableArtifactsBucket
+          - ArtifactsBucketName
+      - Label:
+          default: "Github settings: Optional"
         Parameters:
           - GitHubToken
           - GitHubOrgName
           - GitHubTeamSlug
       - Label:
-          default: "LetsEncrypt configuration: Optional"
+          default: "LetsEncrypt settings: Optional"
         Parameters:
           - LetsEncryptDomain
           - LetsEncryptConfig
@@ -110,12 +161,22 @@ Metadata:
         default: "Instance type"
       KeyName:
         default: "SSH key"
-      ExistingEIP:
-        default: "Elastic IP"
-      ExistingDataVolume:
-        default: "Persistent data volume"
       ManualAZ:
         default: "Availability zone"
+      VpcId:
+        default: "VPC ID"
+      SubnetId:
+        default: "Subnet ID"
+      ExistingEIP:
+        default: "Elastic IP"
+      AccessFrom:
+        default: "Access from"
+      ExistingDataVolume:
+        default: "Persistent data volume"
+      EnableArtifactsBucket:
+        default: "Enable artifacts bucket"
+      ArtifactsBucketName:
+        default: "Artifacts bucket name"
       GitHubToken:
         default: "Github token"
       GitHubOrgName:
@@ -165,25 +226,69 @@ Mappings:
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
   CreateSpot: !Equals [!Ref ResourceType, "spot"]
+  ArtifactsEnabled: !Equals [!Ref EnableArtifactsBucket, "true"]
+  ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
+  VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
+  SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
+  ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
+  # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
+  Route53Defined: !And
+    - !Not [!Equals [!Ref LetsEncryptDomain, ""]]
+    - !Equals [!Ref LetsEncryptConfig, ""]
 
 Resources:
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Condition: ArtifactsEnabled
+    Properties:
+      BucketName: !If [ ArtifactsBucketNameDefined, !Ref ArtifactsBucketName, !Ref "AWS::NoValue" ]
+      LifecycleConfiguration:
+        Rules:
+          - Id: "DeleteObjectsOlderThanYear"
+            ExpirationInDays: 365
+            Status: Enabled
+
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: ArtifactsEnabled
+    DependsOn: ArtifactsBucket
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowReadWriteAcces
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - !If [ CreateEC2, !GetAtt ec2InstanceRole.Arn, !Ref "AWS::NoValue" ]
+                - !If [ CreateSpot, !GetAtt spotInstanceRole.Arn, !Ref "AWS::NoValue" ]
+            Action:
+              - s3:List*
+              - s3:Get*
+              - s3:*Object*
+            Resource:
+              - !Sub arn:aws:s3:::${ArtifactsBucket}
+              - !Sub arn:aws:s3:::${ArtifactsBucket}/*
+
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
+      VpcId: !If [ VpcIdDefined, !Ref VpcId, !Ref "AWS::NoValue" ]
       GroupDescription: 'Enable SSH, HTTP, HTTPS'
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: '22'
           ToPort: '22'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
         - IpProtocol: tcp
           FromPort: '80'
           ToPort: '80'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
         - IpProtocol: tcp
           FromPort: '443'
           ToPort: '443'
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref AccessFrom
 
   FleetRole:
     Type: AWS::IAM::Role
@@ -238,9 +343,8 @@ Resources:
           - sts:AssumeRole
       Path: "/"
 
-  ec2InstancePolicies:
+  rootInstancePolicies:
     Type: AWS::IAM::Policy
-    Condition: CreateEC2
     Properties:
       PolicyName: root
       PolicyDocument:
@@ -251,8 +355,25 @@ Resources:
             - "cloudformation:DescribeStacks"
             - "ec2:DescribeInstances"
             - "ec2:AttachVolume"
+            - "ec2:DetachVolume"
             - "ec2:AssociateAddress"
+            - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
+          Resource: "*"
+      Roles:
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
+
+  route53InstancePolicies:
+    Type: AWS::IAM::Policy
+    Condition: Route53Defined
+    Properties:
+      PolicyName: route53
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
             - "route53:ListHostedZones"
@@ -262,7 +383,8 @@ Resources:
             - "route53:ListHostedZonesByName"
           Resource: "*"
       Roles:
-        - !Ref ec2InstanceRole
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
 
   ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -286,32 +408,6 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: "/"
-
-  spotInstancePolicies:
-    Type: AWS::IAM::Policy
-    Condition: CreateSpot
-    Properties:
-      PolicyName: root
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Action:
-            - "cloudformation:DescribeStacks"
-            - "ec2:DescribeInstances"
-            - "ec2:AttachVolume"
-            - "ec2:AssociateAddress"
-            - "ec2:DescribeVolumes"
-            # Permissions necessary for TXT record updates in Route53
-            - "route53:GetHostedZone"
-            - "route53:ListHostedZones"
-            - "route53:ChangeResourceRecordSets"
-            - "route53:ListResourceRecordSets"
-            - "route53:GetHostedZoneCount"
-            - "route53:ListHostedZonesByName"
-          Resource: "*"
-      Roles:
-        - !Ref spotInstanceRole
 
   spotInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -351,10 +447,15 @@ Resources:
               - DeviceName: /dev/sda1
                 Ebs:
                   VolumeSize: '8'
+            SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
             UserData: !Base64
               'Fn::Join':
                 - ''
                 - - |
+                # add to the end of init script echo line with template variable values, for recreate instance on every variable change
+                  - !Sub
+                    - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                    - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -368,23 +469,36 @@ Resources:
       Tags:
       - Key: StackId
         Value: !Ref AWS::StackId
-      SecurityGroups:
-        - !Ref InstanceSecurityGroup
+      SecurityGroupIds:
+        - !GetAtt InstanceSecurityGroup.GroupId
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: '8'
+      SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
       UserData: !Base64
         'Fn::Join':
           - ''
           - - |
+          # add to the end of init script echo line with template variable values, for recreate instance on every variable change
+            - !Sub
+              - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+              - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
 
 Outputs:
   IPAddress:
-    Value: !Ref ExistingEIP
+    Description: If not shown here, IP can be found in EC2 dashboard under instance details
+    Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
+  InstanceURL:
+    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
+  SSHConnect:
+    Description: SSH connection string
+    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ] ] ] ]
   PersistentVolume:
     Value: !Ref ExistingDataVolume
+  ArtifactsBucket:
+    Value: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
   GitHubToken:
     Value: !Ref GitHubToken
   GitHubOrgName:
@@ -395,5 +509,3 @@ Outputs:
     Value: !Ref LetsEncryptDomain
   LetsEncryptConfig:
     Value: !Ref LetsEncryptConfig
-  InstanceURL:
-    Value: !Join [ '', [ 'https://', !Ref ExistingEIP, '.nip.io' ] ]
