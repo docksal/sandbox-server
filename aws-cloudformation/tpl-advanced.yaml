@@ -6,7 +6,7 @@ Parameters:
     Description: |
       EC2 resource type.
       Use "ec2" (on-demand) for guaranteed server uptime.
-      Use "spot" to save up to 80% of EC2 costs, if an accasional (once in a few months) instance downtime
+      Use "spot" to save up to 80% of EC2 costs, if an occasional (once in a few months) instance downtime
       of 5-10 minutes is acceptible.
       Make sure to configure a presistent data volume to avoid data loss in spot mode (see below).
     Type: String
@@ -95,16 +95,17 @@ Parameters:
     Default: ""
   LetsEncryptDomain:
     Description: |
-      Domain name for which the SSL certificate will be issued. 
-      Example: for "example.com" an SNI wildcard cert will be issue covering both "example.com" and "*.example.com".
+      Domain name for which a wildcard LetsEncrypt certificate will be issued.
+      Example: for "example.com", an SNI wildcard cert will be issued covering both "example.com" and "*.example.com".
     Type: String
     Default: ""
   LetsEncryptConfig:
     Description: |
-      Configuration for automated LetsEncrypt SSL certificate provisioning (space delimited variable="value" pairs). 
+      Configuration for automated LetsEncrypt certificate provisioning (space delimited variable="value" pairs).
       Info about available options: https://github.com/Neilpang/acme.sh/wiki/dnsapi. 
       Example: DSP="dns_aws" AWS_ACCESS_KEY_ID="aws_access_key_id" AWS_SECRET_ACCESS_KEY="aws_secret_key". 
-      Note: Leave empty if the domain is managed in AWS Route53 in the same account.
+      Note: If the domain is managed in AWS Route53 in the same AWS account, then leave this field empty to give the EC2
+      instance the necessary permissions to managed TXT records in Route53.
     Type: String
     Default: ""
   EnableArtifactsBucket:
@@ -230,6 +231,10 @@ Conditions:
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
   ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
+  # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
+  Route53Defined: !And
+    - !Not [!Equals [!Ref LetsEncryptDomain, ""]]
+    - !Equals [!Ref LetsEncryptConfig, ""]
 
 Resources:
   ArtifactsBucket:
@@ -338,9 +343,8 @@ Resources:
           - sts:AssumeRole
       Path: "/"
 
-  ec2InstancePolicies:
+  rootInstancePolicies:
     Type: AWS::IAM::Policy
-    Condition: CreateEC2
     Properties:
       PolicyName: root
       PolicyDocument:
@@ -355,6 +359,21 @@ Resources:
             - "ec2:AssociateAddress"
             - "ec2:DisassociateAddress"
             - "ec2:DescribeVolumes"
+          Resource: "*"
+      Roles:
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
+
+  route53InstancePolicies:
+    Type: AWS::IAM::Policy
+    Condition: Route53Defined
+    Properties:
+      PolicyName: route53
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
             # Permissions necessary for TXT record updates in Route53
             - "route53:GetHostedZone"
             - "route53:ListHostedZones"
@@ -364,7 +383,8 @@ Resources:
             - "route53:ListHostedZonesByName"
           Resource: "*"
       Roles:
-        - !Ref ec2InstanceRole
+        - !If [ CreateEC2, !Ref ec2InstanceRole, !Ref "AWS::NoValue" ]
+        - !If [ CreateSpot, !Ref spotInstanceRole, !Ref "AWS::NoValue" ]
 
   ec2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -388,34 +408,6 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: "/"
-
-  spotInstancePolicies:
-    Type: AWS::IAM::Policy
-    Condition: CreateSpot
-    Properties:
-      PolicyName: root
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Action:
-            - "cloudformation:DescribeStacks"
-            - "ec2:DescribeInstances"
-            - "ec2:AttachVolume"
-            - "ec2:DetachVolume"
-            - "ec2:AssociateAddress"
-            - "ec2:DisassociateAddress"
-            - "ec2:DescribeVolumes"
-            # Permissions necessary for TXT record updates in Route53
-            - "route53:GetHostedZone"
-            - "route53:ListHostedZones"
-            - "route53:ChangeResourceRecordSets"
-            - "route53:ListResourceRecordSets"
-            - "route53:GetHostedZoneCount"
-            - "route53:ListHostedZonesByName"
-          Resource: "*"
-      Roles:
-        - !Ref spotInstanceRole
 
   spotInstanceProfile:
     Type: AWS::IAM::InstanceProfile
