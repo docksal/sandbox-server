@@ -11,6 +11,7 @@ AWS CloudFormation handles all of that.
 
 For an overview of AWS CloudFormation, see the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.)
 
+<a name="features"></a>
 ## Features
 
 - Turn-key AWS infrastructure provisioning using CloudFormation
@@ -86,6 +87,7 @@ Note: You will need the key you selected to access the sandbox server in further
 You can now proceed to [Access the sandbox server](/README.md#server-access) 
 
 
+<a name="features-details"></a>
 ## Features details
 
 <a name="smart-resource-management"></a>
