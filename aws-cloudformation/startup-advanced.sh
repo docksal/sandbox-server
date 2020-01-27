@@ -33,7 +33,6 @@ MOUNT_POINT="/data"
 BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
 BUILD_USER_HOME="/home/${BUILD_USER}"
-DATA_BUILD_USER_HOME="${MOUNT_POINT}${BUILD_USER_HOME}"
 DOCKSAL_VERSION="master"
 PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
@@ -42,6 +41,17 @@ ATTACH_VOLUME_AS="/dev/sdp"
 
 ##########
 # Functions begin
+move_to_data()
+{
+    local SRC_DIR=$1
+    local DST_DIR=$2
+    if [[ ! -d ${DST_DIR}${SRC_DIR} ]]; then
+        mkdir -p ${DST_DIR}${SRC_DIR}
+        [[ -d ${SRC_DIR} ]] && [[ ! -L ${SRC_DIR} ]] && mv ${SRC_DIR} ${DST_DIR}$(dirname ${SRC_DIR})
+    fi
+    rm -rf ${SRC_DIR} && ln -s ${DST_DIR}${SRC_DIR} ${SRC_DIR}
+}
+
 wait_volume_status()
 {
     # Wait for EBS volume status.
@@ -52,9 +62,8 @@ wait_volume_status()
     while true
     do
         let "wait_count+=1"
-        # Check volume status. Non-empty output means volume is available and we can proceed.
-        result=$(aws ec2 describe-volumes --volume-ids ${volume} --filters "Name=status,Values=${status}" --output text)
-        [[ "${result}" != "" ]] && break
+        # Check volume status. Non-empty output means volume in required status and we can proceed.
+        [[ "$(aws ec2 describe-volumes --volume-ids ${volume} --filters "Name=status,Values=${status}" --output text)" != "" ]] && break
 
         # Fail if reached maximum attempts
         if (( ${wait_count} > ${wait_max_attempts} )); then
@@ -70,18 +79,18 @@ wait_volume_status()
 reread_device()
 {
     DEVICE=$1
-    hdparm -z ${DEVICE} >>/var/log/device.log 2>&1 || true
-    file -s ${DEVICE} >>/var/log/device.log 2>&1 || true
-    partprobe ${DEVICE} >>/var/log/device.log 2>&1 || true
-    blockdev --rereadpt -v ${DEVICE} >>/var/log/device.log 2>&1 || true
-    fdisk -l ${DEVICE} >>/var/log/device.log 2>&1 || true
+    hdparm -z ${DEVICE} || true
+    file -s ${DEVICE} || true
+    partprobe ${DEVICE} || true
+    blockdev --rereadpt -v ${DEVICE} || true
+    fdisk -l ${DEVICE} || true
 }
 
 mount_part()
 {
     DATA_DISK=$1
     # mark disk with label
-    tune2fs -L ${DISK_LABEL} ${DATA_DISK} >/dev/null 2>&1
+    tune2fs -L ${DISK_LABEL} ${DATA_DISK}
     # Mount the data disk
     mkdir -p ${MOUNT_POINT}
     mount ${DATA_DISK} ${MOUNT_POINT}
@@ -91,7 +100,7 @@ create_fs()
 {
     # creating ext4 fs and add label
     DATA_DISK=$1
-    mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK} -L ${DISK_LABEL} >/dev/null 2>&1
+    mkfs.ext4 -m 0 -F -E lazy_itable_init=0,lazy_journal_init=0,discard ${DATA_DISK} -L ${DISK_LABEL}
 }
 
 get_disk_info()
@@ -100,7 +109,6 @@ get_disk_info()
     # the result will contain strings: NAME="/dev/nvme1n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT="" NAME="/dev/nvme0n1";TYPE="disk";FSTYPE="";LABEL="";MOUNTPOINT=""
     DATA_DISK=$1
     reread_device "$DATA_DISK"
-    device_list="$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | sed 's/ /;/g')"
     while read device_info
     do
       eval ${device_info}
@@ -108,7 +116,7 @@ get_disk_info()
       [[ ${MOUNTPOINT} != "" ]] && return
       # exit if device has ext4 fs
       [[ ${FSTYPE} == "ext4" ]] && return
-    done <<< ${device_list}
+    done <<< "$(lsblk -p -n -P -o NAME,TYPE,FSTYPE,LABEL,MOUNTPOINT ${DATA_DISK} 2>&1 | sed 's/ /;/g')"
     # if not found ext4 fs return empty data for creating new fs
     NAME=""; TYPE=""; FSTYPE=""; LABEL=""; MOUNTPOINT=""
 }
@@ -145,7 +153,7 @@ do
   STACK_STATUS=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].StackStatus' --output text)
   if [[ "${STACK_STATUS}" == *"UPDATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"CREATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"ROLLBACK_COMPLETE"* ]]
   then
-      stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} | md5sum | cut -d' ' -f1)
+      stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters' --output text | sort | md5sum | cut -d' ' -f1)
       break
   fi
   sleep 5
@@ -160,8 +168,31 @@ export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${ST
 export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptConfig`].ParameterValue' --output text)
 export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsBucket`].OutputValue' --output text)
 
+# attach/detach elastic ip
+if [[ "${EIP}" != "${ATTACHED_IP}" ]]
+then
+    # try to detach attached ip. elastic ip will be detached, but autoassigned ip remain attached
+    aws ec2 disassociate-address --public-ip ${ATTACHED_IP} || true
+    # try to attach elastic ip if defined in template. in case user defined wrong ip, instance will be accessible on autoassigned ip
+    [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} || true
+fi
+
 # stop docker daemon before partitions manipulation
 service docker stop || true
+
+# back compatibility fix: remove automounting data-volume from /etc/fstab
+sed -i "/LABEL=${DISK_LABEL}/d" /etc/fstab || true
+umount -f ${MOUNT_POINT} || true
+
+# Create build-agent user with no-password sudo access
+# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
+# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
+if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
+    adduser --disabled-password --gecos "" --home ${BUILD_USER_HOME} --uid ${BUILD_USER_UID} ${BUILD_USER}
+    usermod -aG sudo ${BUILD_USER}
+    echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
+    move_to_data ${BUILD_USER_HOME} ${MOUNT_POINT}
+fi
 
 # detach attached volume if template volume parameter changed
 if [[ "${ATTACHED_VOLUME}" != "${VOLUME_ID}" ]]
@@ -169,7 +200,8 @@ then
     if [[ "${ATTACHED_VOLUME}" != "" ]]
     then
         aws ec2 detach-volume --volume-id ${ATTACHED_VOLUME} || true
-        [[ "${VOLUME_ID}" != "" ]] && wait_volume_status ${ATTACHED_VOLUME} "available"
+        # wait detaching attached volume because attaching new volume with existing device name /dev/sdp returns error
+        wait_volume_status ${ATTACHED_VOLUME} "available"
     fi
     if [[ "${VOLUME_ID}" != "" ]]
     then
@@ -178,16 +210,7 @@ then
     fi
 fi
 
-# Create build-agent user with no-password sudo access
-# Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
-# (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
-if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
-    adduser --disabled-password --home ${DATA_BUILD_USER_HOME} --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
-    usermod -aG sudo ${BUILD_USER}
-    echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
-fi
-
-# attach volume if exist
+# mount volume if exist
 if [[ "${VOLUME_ID}" != "" ]]
 then
     # Wait for data volume attachment to complete
@@ -217,35 +240,19 @@ then
         [[ "$MOUNTPOINT" != "" ]] && { echo "Disk $NAME already mounted! Skipping..."; continue; }
         [[ "$FSTYPE" == "ext4" ]] && { echo "Disk $NAME have ext4 filesystem but not mounted! Mounting..."; mount_part "$NAME"; continue; }
         echo "Disk ${disk} is clean! Creating partition..."
-        wipefs -fa ${disk} >/dev/null
+        wipefs -fa ${disk}
         create_part "${disk}"
         create_fs "${disk}"
         mount_part "${disk}"
     done
 fi
 
-# attach/detach elastic ip
-if [[ "${EIP}" != "${ATTACHED_IP}" ]]
-then
-    # try to detach attached ip. elastic ip will be detached, but autoassigned ip remain attached
-    aws ec2 disassociate-address --public-ip ${ATTACHED_IP} 2>/dev/null || true
-    # try to attach elastic ip if defined in template. in case user defined wrong ip, instance will be accessible on autoassigned ip
-    [[ "${EIP}" != "" ]] && aws ec2 associate-address --instance-id ${INSTANCE_ID} --public-ip ${EIP} 2>/dev/null || true
-fi
-
-# move existing user home directory to /data
-if [[ ! -d ${DATA_BUILD_USER_HOME} ]]; then
-    mkdir -p $(dirname ${DATA_BUILD_USER_HOME})
-    [[ -d ${BUILD_USER_HOME} ]] && [[ ! -L ${BUILD_USER_HOME} ]] && mv ${BUILD_USER_HOME} $(dirname ${DATA_BUILD_USER_HOME}) || cp -a /etc/skel/. ${DATA_BUILD_USER_HOME}
-fi
-rm -rf ${BUILD_USER_HOME} && ln -s ${DATA_BUILD_USER_HOME} ${BUILD_USER_HOME}
-
-# create docker directory in /data if does not exists
-if [[ ! -d ${MOUNT_POINT}/var/lib/docker ]]; then
-    mkdir -p ${MOUNT_POINT}/var/lib/docker
-    [[ -d /var/lib/docker ]] && [[ ! -L /var/lib/docker ]] && mv /var/lib/docker ${MOUNT_POINT}/var/lib/
-fi
-rm -rf /var/lib/docker && ln -s ${MOUNT_POINT}/var/lib/docker /var/lib/docker
+# move existing user home directory to /data directory
+move_to_data ${BUILD_USER_HOME} ${MOUNT_POINT}
+# copy skelet files to user home if empty. empty home dir will be in case when stack updated with attached data volume without data
+[ "$(ls -A ${MOUNT_POINT}${BUILD_USER_HOME} 2>/dev/null)" ] || cp -a /etc/skel/. ${MOUNT_POINT}${BUILD_USER_HOME}
+# move docker files to /data directory
+move_to_data /var/lib/docker ${MOUNT_POINT}
 
 # Create the projects/builds directory, SSH settings: ensure ~/.ssh exists for the build user
 mkdir -p ${PROJECTS_ROOT} ${BUILD_USER_HOME}/.ssh
@@ -322,9 +329,9 @@ fi
 
 if [[ "${old_stack_md5sum}" != "${stack_md5sum}" ]]
 then
+    ACMESH_CONTAINER="docksal-acme.sh"
     if [[ "${LETSENCRYPT_DOMAIN}" != "" ]]
     then
-        ACMESH_CONTAINER="docksal-acme.sh"
         ACMESH_PATH="${BUILD_USER_HOME}/letsencrypt/acme.sh/data"
         CERTOUT_PATH="${BUILD_USER_HOME}/.docksal/certs"
         DSP="${DSP:-dns_aws}"
@@ -360,7 +367,6 @@ then
             chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/"
         fi
     else
-        ACMESH_CONTAINER="docksal-acme.sh"
         docker rm -vf ${ACMESH_CONTAINER} 2>/dev/null || true
     fi
 fi
@@ -369,7 +375,7 @@ fi
 mkdir -p ${BUILD_USER_HOME}/artifacts
 sed -i '/ARTIFACTS_S3_BUCKET/d' "${BUILD_USER_HOME}/.docksal/docksal.env" || true
 echo ARTIFACTS_S3_BUCKET=\"${ARTIFACTS_S3_BUCKET}\" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
-chown -R ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/artifacts"
+chown ${BUILD_USER}:${BUILD_USER} "${BUILD_USER_HOME}/artifacts"
 
 if [[ "${ARTIFACTS_S3_BUCKET}" != "" ]]
 then
