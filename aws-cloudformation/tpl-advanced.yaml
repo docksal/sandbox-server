@@ -6,9 +6,9 @@ Parameters:
     Description: |
       EC2 resource type.
       Use "ec2" (on-demand) for guaranteed server uptime.
-      Use "spot" to save up to 80% of EC2 costs, if an occasional (once in a few months) instance downtime
-      of 5-10 minutes is acceptible.
-      Make sure to configure a presistent data volume to avoid data loss in spot mode (see below).
+      Use "spot" to save up to 90% of EC2 costs, if an occasional (once in a few months) instance downtime
+      of 5-10 minutes is acceptable.
+      Make sure to configure a persistent data volume to avoid data loss in spot mode (see below).
     Type: String
     Default: ec2
     AllowedValues:
