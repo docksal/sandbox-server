@@ -117,16 +117,29 @@ If you have an existing AWS account (with billing and an SSH key pair), just cli
 
 [![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/stable/advanced.yaml)
 
-You will be prompted for:
+You will be prompted for few required and optional settings.
 
-- Resource type (`ec2` vs `spot`)
-- Instance type
-- SSH key name
-- Availability zone
-- Elastic IP
-- Persistent data volume
-- Github configuration - used for SSH authentication (options)
-- LetsEncrypt configuration (optional)
+- Basic: Required
+  - Resource type (`ec2` vs `spot`)
+  - Instance type
+  - SSH key
+  - Availability zone
+- VPC/Network: Optional**
+  - VPC ID
+  - Subnet ID
+  - Elastic IP
+  - Access from
+- Storage: Optional
+  - Persistent data volume
+  - Enable artifacts bucket
+  - Artifacts bucket name
+- Github settings: Optional - used for SSH authentication via GitHub org/team
+  - Github token
+  - Github organization
+  - Github team
+- LetsEncrypt settings: Optional
+  - Sandbox domain name
+  - LetsEncrypt configuration
 
 Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation (`<external-ip>`). 
 
