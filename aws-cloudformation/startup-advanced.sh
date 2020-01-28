@@ -205,6 +205,9 @@ then
     fi
     if [[ "${VOLUME_ID}" != "" ]]
     then
+        # detach volume from another instance
+        aws ec2 detach-volume --volume-id ${VOLUME_ID} || true
+        wait_volume_status ${VOLUME_ID} "available"
         aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device ${ATTACH_VOLUME_AS} || true
         wait_volume_status ${VOLUME_ID} "in-use"
     fi
@@ -358,7 +361,7 @@ then
             --domain "*.${LETSENCRYPT_DOMAIN}" \
             --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
             --key-file /out/${LETSENCRYPT_DOMAIN}.key \
-            --log /proc/1/fd/1
+            --log /proc/1/fd/1 || true
 
         if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
         then
