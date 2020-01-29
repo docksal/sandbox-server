@@ -151,7 +151,7 @@ export ATTACHED_VOLUME=$(aws ec2 describe-volumes --filters Name=attachment.inst
 while true
 do
   STACK_STATUS=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].StackStatus' --output text)
-  if [[ "${STACK_STATUS}" == *"UPDATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"CREATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"ROLLBACK_COMPLETE"* ]]
+  if [[ "${STACK_STATUS}" == "UPDATE_COMPLETE" ]] || [[ "${STACK_STATUS}" == "CREATE_COMPLETE" ]]
   then
       stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters' --output text | sort | md5sum | cut -d' ' -f1)
       break
@@ -205,9 +205,6 @@ then
     fi
     if [[ "${VOLUME_ID}" != "" ]]
     then
-        # detach volume from another instance
-        aws ec2 detach-volume --volume-id ${VOLUME_ID} || true
-        wait_volume_status ${VOLUME_ID} "available"
         aws ec2 attach-volume --volume-id ${VOLUME_ID} --instance-id ${INSTANCE_ID} --device ${ATTACH_VOLUME_AS} || true
         wait_volume_status ${VOLUME_ID} "in-use"
     fi
