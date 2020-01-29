@@ -151,7 +151,7 @@ export ATTACHED_VOLUME=$(aws ec2 describe-volumes --filters Name=attachment.inst
 while true
 do
   STACK_STATUS=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].StackStatus' --output text)
-  if [[ "${STACK_STATUS}" == *"UPDATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"CREATE_COMPLETE"* ]] || [[ "${STACK_STATUS}" == *"ROLLBACK_COMPLETE"* ]]
+  if [[ "${STACK_STATUS}" =~ ^(UPDATE_COMPLETE|CREATE_COMPLETE|ROLLBACK_COMPLETE)$ ]]
   then
       stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters' --output text | sort | md5sum | cut -d' ' -f1)
       break
@@ -358,7 +358,7 @@ then
             --domain "*.${LETSENCRYPT_DOMAIN}" \
             --fullchain-file /out/${LETSENCRYPT_DOMAIN}.crt \
             --key-file /out/${LETSENCRYPT_DOMAIN}.key \
-            --log /proc/1/fd/1
+            --log /proc/1/fd/1 || true
 
         if [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.key ]] && [[ -f ${CERTOUT_PATH}/${LETSENCRYPT_DOMAIN}.crt ]]
         then
