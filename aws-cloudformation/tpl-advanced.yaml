@@ -230,13 +230,17 @@ Conditions:
   ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
-  ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
+  ExistingEIPNotDefined: !Equals [!Ref ExistingEIP, ""]
   # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
   Route53Defined: !And
     - !Not [!Equals [!Ref LetsEncryptDomain, ""]]
     - !Equals [!Ref LetsEncryptConfig, ""]
 
 Resources:
+  EIP:
+    Type: AWS::EC2::EIP
+    Condition: ExistingEIPNotDefined
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Condition: ArtifactsEnabled
@@ -454,8 +458,9 @@ Resources:
                 - - |
                 # add to the end of init script echo line with template variable values, for recreate instance on every variable change
                   - !Sub
-                    - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                    - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
                     - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
+                      eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -483,18 +488,18 @@ Resources:
           - - |
           # add to the end of init script echo line with template variable values, for recreate instance on every variable change
             - !Sub
-              - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+              - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
               - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
+                eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
 
 Outputs:
   IPAddress:
-    Description: If not shown here, IP can be found in EC2 dashboard under instance details
-    Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
+    Value: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ], '.nip.io' ] ]
   SSHConnect:
     Description: SSH connection string
-    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ] ] ] ]
+    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ] ] ]
   PersistentVolume:
     Value: !Ref ExistingDataVolume
   ArtifactsBucket:
