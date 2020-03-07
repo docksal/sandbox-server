@@ -153,13 +153,13 @@ do
   STACK_STATUS=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].StackStatus' --output text)
   if [[ "${STACK_STATUS}" =~ ^(UPDATE_COMPLETE|CREATE_COMPLETE|ROLLBACK_COMPLETE)$ ]]
   then
-      stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters' --output text | sort | md5sum | cut -d' ' -f1)
+      stack_md5sum=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs' --output text | sort | md5sum | cut -d' ' -f1)
       break
   fi
   sleep 5
 done
 
-export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`ExistingEIP`].ParameterValue' --output text)
+export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
 export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`ExistingDataVolume`].ParameterValue' --output text)
 export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubToken`].ParameterValue' --output text)
 export GITHUB_ORG_NAME=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubOrgName`].ParameterValue' --output text)

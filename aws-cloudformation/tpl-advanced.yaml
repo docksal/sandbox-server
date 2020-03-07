@@ -69,16 +69,25 @@ Parameters:
     Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
     Type: String
     Default: ""
-  AccessFrom:
+  AccessFrom1:
     Description: |
-      CIDR block to allow ingress access to the instance. Use "0.0.0.0/0" for unrestricted access.
+      CIDR block to allow ingress access to the instance. Leave empty all Access From fields for unrestricted access.
     Type: String
-    Default: 0.0.0.0/0
+    Default: ""
+  AccessFrom2:
+    Description: |
+      CIDR block to allow ingress access to the instance. Leave empty all Access From fields for unrestricted access.
+    Type: String
+    Default: ""
+  AccessFrom3:
+    Description: |
+      CIDR block to allow ingress access to the instance. Leave empty all Access From fields for unrestricted access.
+    Type: String
+    Default: ""
   ExistingDataVolume:
     Description: |
       Use an existing EBS volume for instance persistent storage.
       Must be located in the same AZ where the instance is created.
-    # Type: "AWS::EC2::Volume::Id"
     Type: String
     Default: ""
   GitHubToken:
@@ -136,7 +145,9 @@ Metadata:
           - VpcId
           - SubnetId
           - ExistingEIP
-          - AccessFrom
+          - AccessFrom1
+          - AccessFrom2
+          - AccessFrom3
       - Label:
           default: "Storage: Optional"
         Parameters:
@@ -169,8 +180,12 @@ Metadata:
         default: "Subnet ID"
       ExistingEIP:
         default: "Elastic IP"
-      AccessFrom:
-        default: "Access from"
+      AccessFrom1:
+        default: "Access from cidr 1"
+      AccessFrom2:
+        default: "Access from cidr 2"
+      AccessFrom3:
+        default: "Access from cidr 3"
       ExistingDataVolume:
         default: "Persistent data volume"
       EnableArtifactsBucket:
@@ -230,13 +245,23 @@ Conditions:
   ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
-  ExistingEIPDefined: !Not [!Equals [!Ref ExistingEIP, ""]]
+  ExistingEIPNotDefined: !Equals [!Ref ExistingEIP, ""]
   # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
   Route53Defined: !And
     - !Not [!Equals [!Ref LetsEncryptDomain, ""]]
     - !Equals [!Ref LetsEncryptConfig, ""]
+  AccessFrom1Defined: !Not [ !Equals [!Ref AccessFrom1, ""] ]
+  AccessFrom2Defined: !Not [ !Equals [!Ref AccessFrom2, ""] ]
+  AccessFrom3Defined: !Not [ !Equals [!Ref AccessFrom3, ""] ]
+  AccessFromDefined: !Or [ Condition: AccessFrom1Defined, Condition: AccessFrom2Defined, Condition: AccessFrom3Defined ]
+  AccessFromUnDefined: !Not [ Condition: AccessFromDefined ]
+
 
 Resources:
+  EIP:
+    Type: AWS::EC2::EIP
+    Condition: ExistingEIPNotDefined
+
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Condition: ArtifactsEnabled
@@ -276,19 +301,152 @@ Resources:
     Properties:
       VpcId: !If [ VpcIdDefined, !Ref VpcId, !Ref "AWS::NoValue" ]
       GroupDescription: 'Enable SSH, HTTP, HTTPS'
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
-          CidrIp: !Ref AccessFrom
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: !Ref AccessFrom
-        - IpProtocol: tcp
-          FromPort: '443'
-          ToPort: '443'
-          CidrIp: !Ref AccessFrom
+
+  localIngress22:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Sub
+        - ${eip}/32
+        - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
+  localIngress80:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: !Sub
+        - ${eip}/32
+        - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
+  localIngress443:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Sub
+        - ${eip}/32
+        - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
+
+  cidr1Ingress22:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom1Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref AccessFrom1
+  cidr1Ingress80:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom1Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: !Ref AccessFrom1
+  cidr1Ingress443:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom1Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Ref AccessFrom1
+
+  cidr2Ingress22:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom2Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref AccessFrom2
+  cidr2Ingress80:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom2Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: !Ref AccessFrom2
+  cidr2Ingress443:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom2Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Ref AccessFrom2
+
+  cidr3Ingress22:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom3Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !Ref AccessFrom3
+  cidr3Ingress80:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom3Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: !Ref AccessFrom3
+  cidr3Ingress443:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFrom3Defined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Ref AccessFrom3
+
+  cidrAllIngress22:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromUnDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: "0.0.0.0/0"
+  cidrAllIngress80:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromUnDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: "0.0.0.0/0"
+  cidrAllIngress443:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Condition: AccessFromUnDefined
+    Properties:
+      GroupId: !GetAtt InstanceSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: "0.0.0.0/0"
 
   FleetRole:
     Type: AWS::IAM::Role
@@ -454,8 +612,9 @@ Resources:
                 - - |
                 # add to the end of init script echo line with template variable values, for recreate instance on every variable change
                   - !Sub
-                    - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+                    - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
                     - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
+                      eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
@@ -483,18 +642,18 @@ Resources:
           - - |
           # add to the end of init script echo line with template variable values, for recreate instance on every variable change
             - !Sub
-              - echo ${ExistingEIP}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
+              - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
               - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
+                eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
 
 Outputs:
   IPAddress:
-    Description: If not shown here, IP can be found in EC2 dashboard under instance details
-    Value: !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]]
+    Value: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
   InstanceURL:
-    Value: !Join [ '', [ 'https://', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ]], '.nip.io' ] ]
+    Value: !Join [ '', [ 'https://', !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ], '.nip.io' ] ]
   SSHConnect:
     Description: SSH connection string
-    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPDefined, !Ref ExistingEIP, !If [ CreateEC2, !GetAtt ec2Instance.PublicIp, "" ] ] ] ]
+    Value: !Join [ '', [ 'ssh build-agent@', !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ] ] ]
   PersistentVolume:
     Value: !Ref ExistingDataVolume
   ArtifactsBucket:
