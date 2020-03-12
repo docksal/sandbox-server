@@ -253,9 +253,7 @@ Conditions:
   AccessFrom1Defined: !Not [ !Equals [!Ref AccessFrom1, ""] ]
   AccessFrom2Defined: !Not [ !Equals [!Ref AccessFrom2, ""] ]
   AccessFrom3Defined: !Not [ !Equals [!Ref AccessFrom3, ""] ]
-  AccessFromDefined: !Or [ Condition: AccessFrom1Defined, Condition: AccessFrom2Defined, Condition: AccessFrom3Defined ]
-  AccessFromUnDefined: !Not [ Condition: AccessFromDefined ]
-
+  AccessFromUnDefined: !Not [ !Or [ Condition: AccessFrom1Defined, Condition: AccessFrom2Defined, Condition: AccessFrom3Defined ] ]
 
 Resources:
   EIP:
@@ -302,36 +300,12 @@ Resources:
       VpcId: !If [ VpcIdDefined, !Ref VpcId, !Ref "AWS::NoValue" ]
       GroupDescription: 'Enable SSH, HTTP, HTTPS'
 
-  localIngress22:
+  localIngressAll:
     Type: 'AWS::EC2::SecurityGroupIngress'
-    Condition: AccessFromDefined
     Properties:
       GroupId: !GetAtt InstanceSecurityGroup.GroupId
-      IpProtocol: tcp
-      FromPort: 22
-      ToPort: 22
-      CidrIp: !Sub
-        - ${eip}/32
-        - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
-  localIngress80:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Condition: AccessFromDefined
-    Properties:
-      GroupId: !GetAtt InstanceSecurityGroup.GroupId
-      IpProtocol: tcp
-      FromPort: 80
-      ToPort: 80
-      CidrIp: !Sub
-        - ${eip}/32
-        - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
-  localIngress443:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Condition: AccessFromDefined
-    Properties:
-      GroupId: !GetAtt InstanceSecurityGroup.GroupId
-      IpProtocol: tcp
-      FromPort: 443
-      ToPort: 443
+      Description: "Allow all traffic from own external IP"
+      IpProtocol: -1
       CidrIp: !Sub
         - ${eip}/32
         - eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
