@@ -304,7 +304,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroupIngress'
     Properties:
       GroupId: !GetAtt InstanceSecurityGroup.GroupId
-      Description: "Allow all traffic from server to his external ip"
+      Description: "Allow all traffic from own external IP"
       IpProtocol: -1
       CidrIp: !Sub
         - ${eip}/32
