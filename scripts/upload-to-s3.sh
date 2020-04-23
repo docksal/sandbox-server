@@ -32,7 +32,9 @@ VERSION_HOTFIX=${ver_arr[2]}  # "2.7.0" => "0"
 
 EDGE_UPLOAD_DIR=${UPLOAD_DIR}/edge
 STABLE_UPLOAD_DIR=${UPLOAD_DIR}/stable
-RELEASE_UPLOAD_DIR=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}
+RELEASE_UPLOAD_DIR_MAJOR=${UPLOAD_DIR}/v${VERSION_MAJOR}
+RELEASE_UPLOAD_DIR_MINOR=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}
+RELEASE_UPLOAD_DIR_HOTFIX=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_HOTFIX}
 BRANCH_UPLOAD_DIR=${UPLOAD_DIR}/branch/${TRAVIS_BRANCH}
 
 # Skip pull request
@@ -44,8 +46,10 @@ if is_edge; then
 elif is_stable; then
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${STABLE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
 elif is_release; then
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR}.${VERSION_HOTFIX}/${TEMPLATE_TYPE}.yaml --acl public-read
+	# Provide all semver version options (major, major.minor, major.minor.hotfix)
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MAJOR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MINOR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_HOTFIX}/${TEMPLATE_TYPE}.yaml --acl public-read
 else
 	# upload templates for every branch
 	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${BRANCH_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
