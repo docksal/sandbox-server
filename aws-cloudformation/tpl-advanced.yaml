@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Description: Sandbox server template (advanced)
 
 Parameters:
@@ -49,10 +49,11 @@ Parameters:
       Additional EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
       Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
       Will be used cheapest EC2 instance. Option applicable in spot mode only
+      IMPORTANT!!! Instance types InstanceType, InstanceType2 and InstanceType3 should differs, overwise stack creation/update will fail
     Type: String
     # Instances with < 2GB RAM should only be used for testing the CloudFormation template
     # t3.small: 2 vCPU, 2GB RAM
-    Default: t3.small
+    Default: t3.medium
     AllowedValues:
       - t3.nano
       - t3.micro
@@ -80,10 +81,11 @@ Parameters:
       Additional EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
       Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
       Will be used cheapest EC2 instance. Option applicable in spot mode only
+      IMPORTANT!!! Instance types InstanceType, InstanceType2 and InstanceType3 should differs, overwise stack creation/update will fail
     Type: String
     # Instances with < 2GB RAM should only be used for testing the CloudFormation template
     # t3.small: 2 vCPU, 2GB RAM
-    Default: t3.small
+    Default: t3.large
     AllowedValues:
       - t3.nano
       - t3.micro
@@ -625,7 +627,8 @@ Resources:
         TargetCapacity: 1
         IamFleetRole: !GetAtt FleetRole.Arn
         LaunchSpecifications:
-          - InstanceType: !Ref InstanceType
+          - &instance-profile
+            InstanceType: !Ref InstanceType
             IamInstanceProfile:
               Arn:
                 Fn::GetAtt:
@@ -658,71 +661,10 @@ Resources:
                     - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
                       eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
 
-          - InstanceType: !Ref InstanceType2
-            IamInstanceProfile:
-              Arn:
-                Fn::GetAtt:
-                  - spotInstanceProfile
-                  - Arn
-            Placement:
-              AvailabilityZone: !Ref ManualAZ
-            TagSpecifications:
-              - ResourceType: instance
-                Tags:
-                - Key: StackId
-                  Value: !Ref AWS::StackId
-            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
-            KeyName: !Ref KeyName
-            SecurityGroups:
-              - GroupId: !GetAtt InstanceSecurityGroup.GroupId
-            BlockDeviceMappings:
-            # Root volume
-              - DeviceName: /dev/sda1
-                Ebs:
-                  VolumeSize: '8'
-            SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
-            UserData: !Base64
-              'Fn::Join':
-                - ''
-                - - |
-                # add to the end of init script echo line with template variable values, for recreate instance on every variable change
-                  - !Sub
-                    - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
-                    - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
-                      eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
-
-          - InstanceType: !Ref InstanceType3
-            IamInstanceProfile:
-              Arn:
-                Fn::GetAtt:
-                  - spotInstanceProfile
-                  - Arn
-            Placement:
-              AvailabilityZone: !Ref ManualAZ
-            TagSpecifications:
-              - ResourceType: instance
-                Tags:
-                - Key: StackId
-                  Value: !Ref AWS::StackId
-            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
-            KeyName: !Ref KeyName
-            SecurityGroups:
-              - GroupId: !GetAtt InstanceSecurityGroup.GroupId
-            BlockDeviceMappings:
-            # Root volume
-              - DeviceName: /dev/sda1
-                Ebs:
-                  VolumeSize: '8'
-            SubnetId: !If [ SubnetIdDefined, !Ref SubnetId, !Ref "AWS::NoValue" ]
-            UserData: !Base64
-              'Fn::Join':
-                - ''
-                - - |
-                # add to the end of init script echo line with template variable values, for recreate instance on every variable change
-                  - !Sub
-                    - echo ${eip}-${ExistingDataVolume}-${s3name}-${GitHubToken}-${GitHubOrgName}-${GitHubTeamSlug}-${LetsEncryptDomain}-${LetsEncryptConfig} >/dev/null
-                    - s3name: !If [ ArtifactsEnabled, !Ref ArtifactsBucket, "" ]
-                      eip: !If [ ExistingEIPNotDefined, !Ref EIP, !Ref ExistingEIP ]
+          - <<: *instance-profile
+            InstanceType: !Ref InstanceType2
+          - <<: *instance-profile
+            InstanceType: !Ref InstanceType3
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
