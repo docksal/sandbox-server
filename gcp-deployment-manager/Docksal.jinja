@@ -65,7 +65,7 @@ resources:
 
     metadata:
       items:
-      {% for key, value in properties['metadata-from-file'].iteritems() %}
+      {% for key, value in properties['metadata-from-file'].items() %}
       - key: {{ key }}
         value: |
           {{ imports[value]|indent(10) }}
