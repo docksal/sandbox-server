@@ -20,6 +20,9 @@ PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 
+# run init sctipt once
+[[ -f /root/init.lock ]] && exit 0
+
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
@@ -120,3 +123,6 @@ su - ${BUILD_USER} -c "curl -fsSL https://get.docksal.io | DOCKSAL_VERSION=${DOC
 
 # Lock updates (protect against unintentional updates in builds)
 echo "DOCKSAL_LOCK_UPDATES=1" | tee -a "${BUILD_USER_HOME}/.docksal/docksal.env"
+
+# create init flag
+touch /root/init.lock
