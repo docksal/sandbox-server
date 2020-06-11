@@ -26,7 +26,7 @@ PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
-if [[ "$(id -u ${BUILD_USER})" == "" ]]; then
+if [[ "$(id -u ${BUILD_USER} 2>/dev/null || true)" == "" ]]; then
 	adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
 fi
 
