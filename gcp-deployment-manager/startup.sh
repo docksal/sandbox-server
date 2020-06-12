@@ -26,17 +26,17 @@ PROJECTS_ROOT="${BUILD_USER_HOME}/builds"
 # Create build-agent user with no-password sudo access
 # Forcing the uid to avoid race conditions with GCP creating project level users at the same time.
 # (Otherwise, we may run into something like "useradd: UID 1001 is not unique")
-if [[ "$(id -u ${BUILD_USER} 2>/dev/null || true)" == "" ]]; then
+if [[ "$(id -u ${BUILD_USER})" == "" ]]; then
 	adduser --disabled-password --gecos "" --uid ${BUILD_USER_UID} ${BUILD_USER}
+	usermod -aG sudo ${BUILD_USER}
+	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
+# change user id and group id if user created by gcp
+elif [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
+	groupmod -g ${BUILD_USER_UID} ${BUILD_USER}
+	usermod -u ${BUILD_USER_UID}  ${BUILD_USER}
+	usermod -aG sudo ${BUILD_USER}
+	echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 fi
-
-# change user id if user created by gcp
-if [[ "$(id -u ${BUILD_USER})" != "${BUILD_USER_UID}" ]]; then
-	usermod -u ${BUILD_USER_UID} ${BUILD_USER}
-fi
-
-usermod -aG sudo ${BUILD_USER}
-echo "${BUILD_USER} ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/101-${BUILD_USER}
 
 # Mount the persistent data disk if it was attached
 if lsblk ${DATA_DISK} &>/dev/null; then
