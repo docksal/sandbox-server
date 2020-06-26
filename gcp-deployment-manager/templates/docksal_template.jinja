@@ -25,7 +25,7 @@ resources:
         boot: true
         autoDelete: true
         initializeParams:
-          sourceImage: projects/ubuntu-os-cloud/global/images/ubuntu-1804-bionic-v20200610
+          sourceImage: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/ubuntu-minimal-2004-focal-v20200610
       - deviceName: docksal-sandbox-disk-data
         source: docksal-sandbox-disk
       {% if properties["startup"] or properties["docksalDnsDomain"] %}
