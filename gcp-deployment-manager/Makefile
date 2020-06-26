@@ -53,7 +53,7 @@ create:
 
 	$(GCLOUD) deployment-manager deployments create $(TEMPLATE_DEPLOYMENT) \
 		--template=/opt/deployment/templates/docksal_template.jinja \
-		--properties="templateId:'$(TEMPLATE_ID)',region:'$(REGION)',machineType:'$(DEFAULT_MACHINE_SIZE)',preemptive:$(PREEMPTIVE)"
+		--properties="templateId:'$(TEMPLATE_ID)',region:'$(REGION)',machineType:'$(DEFAULT_MACHINE_SIZE)',preemptive:$(PREEMPTIVE),docksalVersion:'$(DOCKSAL_VERSION)'"
 
 	$(GCLOUD) deployment-manager deployments create $(GROUP_DEPLOYMENT) \
 		--template=/opt/deployment/templates/docksal_group.py \
@@ -66,7 +66,7 @@ update:
 
 	$(GCLOUD) deployment-manager deployments update $(TEMPLATE_DEPLOYMENT) \
 		--template=/opt/deployment/templates/docksal_template.jinja \
-		--properties="templateId:'$(TEMPLATE_ID)',region:'$(REGION)',machineType:'$(DEFAULT_MACHINE_SIZE)',preemptive:$(PREEMPTIVE)" \
+		--properties="templateId:'$(TEMPLATE_ID)',region:'$(REGION)',machineType:'$(DEFAULT_MACHINE_SIZE)',preemptive:$(PREEMPTIVE),docksalVersion:'$(DOCKSAL_VERSION)'" \
 		--delete-policy=abandon
 
 	$(GCLOUD) deployment-manager deployments update $(GROUP_DEPLOYMENT) \

@@ -41,3 +41,7 @@ properties:
     type: boolean
     description: Whether or not the machine should be preemptible. Preemptive instances are cheaper overall.
     default: true
+  docksalVersion:
+    type: string
+    description: The version of Docksal to install on the sandbox server.
+    default: develop

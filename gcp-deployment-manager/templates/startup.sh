@@ -8,6 +8,11 @@
 set -x  # Print commands
 set -e  # Fail on errors
 
+# Helper function for getting metadata.
+get_metadata() {
+  curl http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1 -H "Metadata-Flavor: Google" 2>/dev/null
+}
+
 # Persistent disk settings
 DATA_DISK="/dev/sdb"
 MOUNT_POINT="/data"
@@ -15,7 +20,7 @@ BUILD_USER="build-agent"
 BUILD_USER_UID="1100"
 BUILD_USER_HOME="/home/${BUILD_USER}"
 DATA_BUILD_USER_HOME="${MOUNT_POINT}${BUILD_USER_HOME}"
-DOCKSAL_VERSION="develop"
+DOCKSAL_VERSION="$(get_metadata docksalVersion)"
 PROJECT_INACTIVITY_TIMEOUT="0.5h"
 PROJECT_DANGLING_TIMEOUT="168h"
 PROJECTS_ROOT="${BUILD_USER_HOME}/builds"

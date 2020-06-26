@@ -4,6 +4,7 @@
 {% set templateId = properties["templateId"] %}
 {% set deployment = env["deployment"] %}
 {% set preemptive = properties["preemptive"] %}
+{% set docksalVersion = properties["docksalVersion"] %}
 
 resources:
 - name: {{ staticIpName }}
@@ -31,6 +32,8 @@ resources:
       {% if properties["startup"] or properties["docksalDnsDomain"] %}
       metadata:
         items:
+        - key: docksalVersion
+          value: {{ properties["docksalVersion"] }}
         {% if properties["startup"] %}
         - key: startup-script
           value: |
