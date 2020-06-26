@@ -1,0 +1,43 @@
+info:
+  title: Docksal Instance Template
+  author: Les Peabody <lpeabody@gmail.com>
+  description: |
+    Creates a Docksal VM instance template and static IP resource.
+
+additionalProperties: false
+
+imports:
+- path: startup.sh
+  name: startup.sh
+
+properties:
+  region:
+    type: string
+    description: The region which this resource resides.
+    default: us-east4
+  machineType:
+    type: string
+    description: |
+      The type of machine instance to use. Defaults to n1-standard-2.
+    default: n1-standard-2
+  startup:
+    type: string
+    description: |
+      The name of the script processed every time the server starts up.
+    default: startup.sh
+  docksalDnsDomain:
+    type: string
+    description: |
+      A custom domain that points at the sandbox server's IP address.
+  dataDiskName:
+    type: string
+    description: The name of the disk containing instance data.
+    default: docksal-sandbox-disk
+  templateId:
+    type: string
+    description: The resource name attached to the instance template.
+    default: docksal-sandbox-template-001
+  preemptive:
+    type: boolean
+    description: Whether or not the machine should be preemptible. Preemptive instances are cheaper overall.
+    default: true

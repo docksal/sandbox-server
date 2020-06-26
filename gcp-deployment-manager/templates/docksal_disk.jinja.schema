@@ -1,0 +1,17 @@
+info:
+  title: Docksal Data Disk
+  author: Les Peabody <lpeabody@gmail.com>
+  description: |
+    Disk deployment meant to be used with Docksal sandbox infrastructure.
+
+additionalProperties: false
+
+properties:
+  zone:
+    type: string
+    description: The zone which this resource resides.
+    default: us-east4-c
+  diskSizeGb:
+    type: integer
+    description: The size of the disk, in gigabytes (GB).
+    default: 150

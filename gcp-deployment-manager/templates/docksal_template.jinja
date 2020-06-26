@@ -1,0 +1,56 @@
+{% set staticIpName = "static-ip-%s" % env["deployment"] %}
+{% set project = env["project"] %}
+{% set region = properties["region"] %}
+{% set templateId = properties["templateId"] %}
+{% set deployment = env["deployment"] %}
+{% set preemptive = properties["preemptive"] %}
+
+resources:
+- name: {{ staticIpName }}
+  properties:
+    addressType: EXTERNAL
+    description: |
+      The static IP address used for VMs in the deployment
+      {{ deployment }}.
+    region: {{ region }}
+    resourceType: addresses
+  type: gcp-types/compute-v1:addresses
+- name: {{ templateId }}
+  properties:
+    name: {{ templateId }}
+    properties:
+      machineType: {{ properties["machineType"] }}
+      disks:
+      - deviceName: boot
+        boot: true
+        autoDelete: true
+        initializeParams:
+          sourceImage: projects/ubuntu-os-cloud/global/images/ubuntu-1804-bionic-v20200610
+      - deviceName: docksal-sandbox-disk-data
+        source: docksal-sandbox-disk
+      {% if properties["startup"] or properties["docksalDnsDomain"] %}
+      metadata:
+        items:
+        {% if properties["startup"] %}
+        - key: startup-script
+          value: |
+            {{ imports[properties["startup"]]|indent(12) }}
+        {% endif %}
+        {% if properties["docksalDnsDomain"] %}
+        - key: DOCKSAL_DNS_DOMAIN
+          value: {{ properties["docksalDnsDomain"] }}
+        {% endif %}
+      {% endif %}
+      networkInterfaces:
+      - network: https://www.googleapis.com/compute/v1/projects/{{ project }}/global/networks/default
+        accessConfigs:
+        - type: ONE_TO_ONE_NAT
+          name: "External NAT"
+          natIP: $(ref.{{ staticIpName }}.address)
+      scheduling:
+        preemptible: {{ properties["preemptive"] }}
+      tags:
+        items:
+        - http-server
+        - https-server
+  type: gcp-types/compute-v1:instanceTemplates
