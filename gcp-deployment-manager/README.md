@@ -85,8 +85,7 @@ Project SSH keys, and their associated user, are automatically added to all VM i
 Sandboxes are stored in `/home/build-agent/builds`. Therefore, if you need to interact with a sandbox, you must be the user `build-agent`. All users with project-level SSH keys have passwordless sudo access. So, if you are logging into the machine as a user besides `build-agent`, to interact with the builds you must do the following:
 
 1. Run `ssh my-user-id@x.x.x.x`.
-1. Run `sudo -s` to assume root.
-1. Run `su - build-agent`.
+1. Run `sudo su - build-agent` to assume root.
 
 ## Customizing VM instance properties
 
