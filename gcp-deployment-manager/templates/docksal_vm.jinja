@@ -1,0 +1,80 @@
+{#
+
+Docksal VM
+
+Note: Ensure that the docksal-sandbox-disk deployment has already run or this
+will fail.
+
+#}
+
+{% set project = env["project"] %}
+{% set deployment = env["deployment"] %}
+{% set instanceName = "%s-vm" % deployment %}
+{% set zone = properties["zone"] %}
+{% set region = properties["region"] %}
+{% set machineType = properties["machineType"] %}
+{% set staticIpName = "static-ip-%s" % env["deployment"] %}
+{% set dataDiskName = properties["dataDiskName"] %}
+{% set bootDiskId = "%s-boot" % deployment %}
+
+resources:
+
+# Static IP
+- name: {{ staticIpName }}
+  properties:
+    addressType: EXTERNAL
+    description: |
+      The static IP address used for VMs in the deployment
+      {{ deployment }}.
+    region: {{ region }}
+    resourceType: addresses
+  type: gcp-types/compute-v1:addresses
+
+# VM instance
+- type: compute.v1.instance
+  name: {{ instanceName }}
+  properties:
+    zone: {{ zone }}
+    machineType: https://www.googleapis.com/compute/v1/projects/{{ project }}/zones/{{ zone }}/machineTypes/{{ machineType }}
+    tags:
+      items:
+        - http-server
+        - https-server
+
+    disks:
+    - deviceName: {{ bootDiskId }}
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        sourceImage: projects/ubuntu-os-cloud/global/images/ubuntu-minimal-1804-bionic-v20200610
+        diskName: {{ bootDiskId }}
+    - deviceName: {{ dataDiskName }}-data
+      source: projects/{{ project }}/zones/{{ zone }}/disks/{{ dataDiskName }}
+
+    networkInterfaces:
+    - network: https://www.googleapis.com/compute/v1/projects/{{ project }}/global/networks/default
+      # Access Config required to give the instance a public IP address
+      accessConfigs:
+      - name: External IP
+        natIP: $(ref.{{ staticIpName }}.address)
+
+    metadata:
+      items:
+      {% for key, value in properties['metadata-from-file'].items() %}
+      - key: {{ key }}
+        value: |
+          {{ imports[value]|indent(10) }}
+    {% endfor %}
+
+outputs:
+  - name: deployment
+    value: {{ deployment }}
+  - name: project
+    value: {{ project }}
+  - name: vmId
+    value: $(ref.{{ instanceName }}.id)
+  - name: vmName
+    value: {{ instanceName }}
+  - name: vmSelfLink
+    value: $(ref.{{ instanceName }}.selfLink)

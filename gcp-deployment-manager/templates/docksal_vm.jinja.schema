@@ -1,0 +1,40 @@
+info:
+  title: Docksal VM Instance
+  author: Les Peabody <lpeabody@gmail.com>
+  description: |
+    Creates a Docksal VM instance and static IP resource.
+
+additionalProperties: false
+
+imports:
+- path: startup.sh
+  name: startup.sh
+
+properties:
+  region:
+    type: string
+    description: The region which this resource resides.
+    default: us-east4
+  zone:
+    type: string
+    description: The zone which this resource resides.
+    default: us-east4-c
+  machineType:
+    type: string
+    description: |
+      The type of machine instance to use. Defaults to n1-standard-2.
+    default: n1-standard-2
+  metadata-from-file:
+    type: object
+    additionalProperties: false
+    default:
+      startup-script: startup.sh
+    properties:
+      startup-script:
+        type: string
+        description: The name of the script to be imported.
+        default: startup.sh
+  dataDiskName:
+    type: string
+    description: The name of the disk containing instance data.
+    default: docksal-sandbox-disk

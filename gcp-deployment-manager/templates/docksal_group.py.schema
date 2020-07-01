@@ -1,0 +1,22 @@
+info:
+  title: Docksal Managed Instance Group
+  author: Les Peabody <lpeabody@gmail.com>
+  description: |
+    Created a MIG meant to control a singular, preemptible VM.
+
+additionalProperties: false
+
+required:
+  - templateId
+
+properties:
+  zone:
+    type: string
+    description: The zone which this MIG occupies.
+    default: us-east4-c
+  templateId:
+    type: string
+    description: |
+      The current instance template resource name that should be used to
+      generate the sandbox virtual machine.
+    default: docksal-sandbox-template-001

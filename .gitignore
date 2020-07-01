@@ -1,1 +1,5 @@
 */build/
+.vscode
+
+# GCP ignores.
+gcp-deployment-manager/local-override.env
