@@ -15,16 +15,10 @@ Parameters:
       - ec2
       - spot
   InstanceType:
-    Description: |
-      Main EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
-      Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
+    Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
     Type: String
-    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
-    # t3.small: 2 vCPU, 2GB RAM
     Default: t3.small
     AllowedValues:
-      - t3.nano
-      - t3.micro
       - t3.small
       - t3.medium
       - t3.large
@@ -46,17 +40,11 @@ Parameters:
       - r5d.2xlarge
   InstanceType2:
     Description: |
-      Additional EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
-      Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
-      Will be used cheapest EC2 instance. Option applicable in spot mode only
-      IMPORTANT!!! Instance types InstanceType, InstanceType2 and InstanceType3 should differs, overwise stack creation/update will fail
+      Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
+      IMPORTANT: InstanceType, InstanceType2, and InstanceType3 must be unique, overwise stack creation/update will fail.
     Type: String
-    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
-    # t3.small: 2 vCPU, 2GB RAM
     Default: t3.medium
     AllowedValues:
-      - t3.nano
-      - t3.micro
       - t3.small
       - t3.medium
       - t3.large
@@ -78,13 +66,9 @@ Parameters:
       - r5d.2xlarge
   InstanceType3:
     Description: |
-      Additional EC2 instance type. Default: t3.small = 2 vCPU, 2GB RAM.
-      Instances with < 2GB RAM are not recommended and should only be used for testing the CloudFormation template.
-      Will be used cheapest EC2 instance. Option applicable in spot mode only
-      IMPORTANT!!! Instance types InstanceType, InstanceType2 and InstanceType3 should differs, overwise stack creation/update will fail
+      Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
+      IMPORTANT: InstanceType, InstanceType2, and InstanceType3 must be unique, overwise stack creation/update will fail.
     Type: String
-    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
-    # t3.small: 2 vCPU, 2GB RAM
     Default: t3.large
     AllowedValues:
       - t3.nano
