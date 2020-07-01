@@ -42,15 +42,15 @@ is_pr && exit 0
 
 # Upload templates
 if is_edge; then
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${EDGE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${EDGE_UPLOAD_DIR}/${TEMPLATE_TYPE}.json --acl public-read
 elif is_stable; then
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${STABLE_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${STABLE_UPLOAD_DIR}/${TEMPLATE_TYPE}.json --acl public-read
 elif is_release; then
 	# Provide all semver version options (major, major.minor, major.minor.hotfix)
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MAJOR}/${TEMPLATE_TYPE}.yaml --acl public-read
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MINOR}/${TEMPLATE_TYPE}.yaml --acl public-read
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_HOTFIX}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MAJOR}/${TEMPLATE_TYPE}.json --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_MINOR}/${TEMPLATE_TYPE}.json --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${RELEASE_UPLOAD_DIR_HOTFIX}/${TEMPLATE_TYPE}.json --acl public-read
 else
 	# upload templates for every branch
-	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${BRANCH_UPLOAD_DIR}/${TEMPLATE_TYPE}.yaml --acl public-read
+	aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${BRANCH_UPLOAD_DIR}/${TEMPLATE_TYPE}.json --acl public-read
 fi

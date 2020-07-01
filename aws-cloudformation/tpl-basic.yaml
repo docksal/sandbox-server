@@ -1,16 +1,12 @@
-AWSTemplateFormatVersion: 2010-09-09
+AWSTemplateFormatVersion: "2010-09-09"
 Description: Sandbox server template (basic)
 
 Parameters:
   InstanceType:
     Description: "EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM)"
     Type: String
-    # Instances with < 2GB RAM should only be used for testing the CloudFormation template
-    # t3.small: 2 vCPU, 2GB RAM
     Default: t3.small
     AllowedValues:
-      - t3.nano
-      - t3.micro
       - t3.small
       - t3.medium
       - t3.large

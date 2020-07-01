@@ -22,9 +22,10 @@ install:
 
 script:
   - cd aws-cloudformation && ./scripts/bash2yaml startup-${TEMPLATE_TYPE}.sh tpl-${TEMPLATE_TYPE}.yaml
-  - mkdir -p ${LOCAL_DIR} && mv -f template.yaml ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml
+  - aws cloudformation package --template-file template.yaml --s3-bucket null --output-template-file package.json --use-json
+  - mkdir -p ${LOCAL_DIR} && mv -f package.json ${LOCAL_DIR}/${TEMPLATE_TYPE}.json
   - tmp=$(basename $(mktemp -u))
-  - aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.yaml s3://${S3_BUCKET}/${tmp} --acl public-read
+  - aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${tmp} --acl public-read
   - res=$(aws cloudformation validate-template --region ${AWS_REGION} --template-url https://${S3_BUCKET}.s3.amazonaws.com/${tmp} || echo "error")
   - aws s3 rm s3://${S3_BUCKET}/${tmp}
   - if [ "${res}" == "error" ]; then exit 1; fi
