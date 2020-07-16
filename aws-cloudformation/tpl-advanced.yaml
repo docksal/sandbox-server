@@ -178,7 +178,7 @@ Parameters:
     Default: ""
   DocksalVersion:
     Description: |
-      Docksal version. Leave empty for stable release
+      Specify the version of Docksal to install (e.g., v1.14.0). Leave empty to get the latest stable version (master).
     Type: String
     Default: ""
 
