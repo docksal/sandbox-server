@@ -176,6 +176,11 @@ Parameters:
     Description: "Set name for the artifacts bucket. Leave empty to have the bucket name automatically generated."
     Type: String
     Default: ""
+  DocksalVersion:
+    Description: |
+      Docksal version. Leave empty for stable release
+    Type: String
+    Default: ""
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -215,6 +220,10 @@ Metadata:
         Parameters:
           - LetsEncryptDomain
           - LetsEncryptConfig
+      - Label:
+          default: "Docksal settings: Optional"
+        Parameters:
+          - DocksalVersion
     ParameterLabels:
       ResourceType:
         default: "Resource type"
@@ -256,6 +265,8 @@ Metadata:
         default: "Sandbox domain name"
       LetsEncryptConfig:
         default: "LetsEncrypt configuration"
+      DocksalVersion:
+        default: "Docksal version"
 
 Mappings:
   Region2AMI:

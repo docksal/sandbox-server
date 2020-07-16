@@ -159,6 +159,7 @@ do
   sleep 5
 done
 
+# get stack parameters
 export EIP=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`IPAddress`].OutputValue' --output text)
 export VOLUME_ID=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`ExistingDataVolume`].ParameterValue' --output text)
 export GITHUB_TOKEN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`GitHubToken`].ParameterValue' --output text)
@@ -167,6 +168,8 @@ export GITHUB_TEAM_SLUG=$(aws cloudformation describe-stacks --stack-name=${STAC
 export LETSENCRYPT_DOMAIN=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptDomain`].ParameterValue' --output text)
 export LETSENCRYPT_CONFIG=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`LetsEncryptConfig`].ParameterValue' --output text)
 export ARTIFACTS_S3_BUCKET=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Outputs[?OutputKey==`ArtifactsBucket`].OutputValue' --output text)
+USER_DEFINED_DOCKSAL_VERSION=$(aws cloudformation describe-stacks --stack-name=${STACK_ID} --query 'Stacks[*].Parameters[?ParameterKey==`DocksalVersion`].ParameterValue' --output text)
+DOCKSAL_VERSION=${USER_DEFINED_DOCKSAL_VERSION:-${DOCKSAL_VERSION}}
 
 # attach/detach elastic ip
 if [[ "${EIP}" != "${ATTACHED_IP}" ]]
