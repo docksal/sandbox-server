@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ubuntu official owner 099720109477
-latest_ami="ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-????????"
+latest_ami="ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-????????"
 # latest_ami="ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-20191002"
 
 AWS_REGION=$(aws ec2 describe-regions --output text | awk '{print $3}' | xargs)
