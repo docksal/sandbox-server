@@ -41,7 +41,7 @@ Parameters:
   InstanceType2:
     Description: |
       Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
-      IMPORTANT: InstanceType, InstanceType2, and InstanceType3 must be unique, overwise stack creation/update will fail.
+      IMPORTANT: "Instance Type"/"Instance Type 2"/"Instance Type 3" must be unique, overwise stack creation/update will fail.
     Type: String
     Default: t3.medium
     AllowedValues:
@@ -67,7 +67,7 @@ Parameters:
   InstanceType3:
     Description: |
       Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
-      IMPORTANT: InstanceType, InstanceType2, and InstanceType3 must be unique, overwise stack creation/update will fail.
+      IMPORTANT: "Instance Type"/"Instance Type 2"/"Instance Type 3" must be unique, overwise stack creation/update will fail.
     Type: String
     Default: t3.large
     AllowedValues:
@@ -228,11 +228,11 @@ Metadata:
       ResourceType:
         default: "Resource type"
       InstanceType:
-        default: "Instance type"
+        default: "Instance type (primary)"
       InstanceType2:
-        default: "Instance type"
+        default: "Instance type 2 (spot only)"
       InstanceType3:
-        default: "Instance type"
+        default: "Instance type 3 (spot only)"
       KeyName:
         default: "SSH key"
       ManualAZ:
