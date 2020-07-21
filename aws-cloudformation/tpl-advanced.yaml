@@ -64,35 +64,6 @@ Parameters:
       - r5d.large
       - r5d.xlarge
       - r5d.2xlarge
-  InstanceType3:
-    Description: |
-      Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
-      IMPORTANT: "Instance Type"/"Instance Type 2"/"Instance Type 3" must be unique, overwise stack creation/update will fail.
-    Type: String
-    Default: t3.large
-    AllowedValues:
-      - t3.nano
-      - t3.micro
-      - t3.small
-      - t3.medium
-      - t3.large
-      - t3.xlarge
-      - t3.2xlarge
-      - m5.large
-      - m5.xlarge
-      - m5.2xlarge
-      - m5.4xlarge
-      - m5d.large
-      - m5d.xlarge
-      - m5d.2xlarge
-      - m5d.4xlarge
-      - r5.large
-      - r5.xlarge
-      - r5.2xlarge
-      - r5d.large
-      - r5d.xlarge
-      - r5d.2xlarge
-    ConstraintDescription: "Must be a valid EC2 instance type"
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -191,7 +162,6 @@ Metadata:
           - ResourceType
           - InstanceType
           - InstanceType2
-          - InstanceType3
           - KeyName
           - ManualAZ
       - Label:
@@ -231,8 +201,6 @@ Metadata:
         default: "Instance type (primary)"
       InstanceType2:
         default: "Instance type 2 (spot only)"
-      InstanceType3:
-        default: "Instance type 3 (spot only)"
       KeyName:
         default: "SSH key"
       ManualAZ:
@@ -658,8 +626,6 @@ Resources:
 
           - <<: *instance-profile
             InstanceType: !Ref InstanceType2
-          - <<: *instance-profile
-            InstanceType: !Ref InstanceType3
 
   ec2Instance:
     Type: 'AWS::EC2::Instance'
