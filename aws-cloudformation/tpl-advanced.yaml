@@ -244,11 +244,11 @@ Metadata:
       ExistingEIP:
         default: "Elastic IP"
       AccessFrom1:
-        default: "Access from cidr 1"
+        default: "Access from CIDR 1"
       AccessFrom2:
-        default: "Access from cidr 2"
+        default: "Access from CIDR 2"
       AccessFrom3:
-        default: "Access from cidr 3"
+        default: "Access from CIDR 3"
       ExistingDataVolume:
         default: "Persistent data volume"
       EnableArtifactsBucket:
