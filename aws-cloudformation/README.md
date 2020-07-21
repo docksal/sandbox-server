@@ -66,14 +66,18 @@ You will be prompted for a few required and optional settings.
 
 - Basic: Required
   - Resource type (`ec2` vs `spot`)
-  - Instance type
+  - Instance type (primary)
+  - Instance type 2 (spot only)
+  - Instance type 3 (spot only)
   - SSH key
   - Availability zone
 - VPC/Network: Optional
   - VPC ID
   - Subnet ID
   - Elastic IP
-  - Access from
+  - Access from CIDR 1
+  - Access from CIDR 2
+  - Access from CIDR 3
 - Storage: Optional
   - Persistent data volume
   - Enable artifacts bucket
@@ -85,6 +89,8 @@ You will be prompted for a few required and optional settings.
 - LetsEncrypt settings: Optional
   - Sandbox domain name
   - LetsEncrypt configuration
+- Docksal settings: Optional
+  - Docksal version
 
 Once provisioned, the IP address of the server will be printed in the **Outputs** section in CloudFormation (`<external-ip>`). 
 
