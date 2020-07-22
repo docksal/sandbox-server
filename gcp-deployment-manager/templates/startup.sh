@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This is a startup script for a Docksal Sandbox server in GCP.
-# It installs and configures Docksal on a bare Ubuntu machine (tested with Ubuntu 18.04 Minimal).
+# It installs and configures Docksal on a bare Ubuntu machine (tested with Ubuntu 20.04 Minimal).
 #
 # The startup script log can be views via "gcloud compute ssh vm-sandbox-test -- tail -f /var/log/syslog"
 
