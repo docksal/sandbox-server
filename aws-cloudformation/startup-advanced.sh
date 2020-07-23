@@ -327,7 +327,8 @@ then
     sed -i "s|^BACKUP_SSH_PUBLIC_KEY=\".*\"|BACKUP_SSH_PUBLIC_KEY=\"${BACKUP_SSH_PUBLIC_KEY}\"|g" /usr/local/bin/ssh-rake
     chmod +x /usr/local/bin/ssh-rake
     /usr/local/bin/ssh-rake install
-    # remove ec2-instance-connect
+    # Remove ec2-instance-connect as it brakes ssh-rake
+    # See https://github.com/aws/aws-ec2-instance-connect-config/issues/19
     apt-get purge ec2-instance-connect -y
 fi
 
@@ -389,4 +390,3 @@ fi
 
 su - build-agent -c "fin system reset"
 echo "${stack_md5sum}" >/root/stack_last_update
-
