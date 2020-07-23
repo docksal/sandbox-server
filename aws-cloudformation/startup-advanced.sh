@@ -327,6 +327,8 @@ then
     sed -i "s|^BACKUP_SSH_PUBLIC_KEY=\".*\"|BACKUP_SSH_PUBLIC_KEY=\"${BACKUP_SSH_PUBLIC_KEY}\"|g" /usr/local/bin/ssh-rake
     chmod +x /usr/local/bin/ssh-rake
     /usr/local/bin/ssh-rake install
+    # remove ec2-instance-connect
+    apt-get purge ec2-instance-connect -y
 fi
 
 if [[ "${old_stack_md5sum}" != "${stack_md5sum}" ]]
