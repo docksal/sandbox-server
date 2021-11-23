@@ -12,21 +12,17 @@ Parameters:
       - t3.large
       - t3.xlarge
       - t3.2xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
       - m5.large
       - m5.xlarge
       - m5.2xlarge
       - m5.4xlarge
-      - m5d.large
-      - m5d.xlarge
-      - m5d.2xlarge
-      - m5d.4xlarge
       - r5.large
       - r5.xlarge
       - r5.2xlarge
-      - r5d.large
-      - r5d.xlarge
-      - r5d.2xlarge
-    ConstraintDescription: "Must be a valid EC2 instance type"
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
