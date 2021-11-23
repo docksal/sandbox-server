@@ -61,37 +61,37 @@ Metadata:
 Mappings:
   Region2AMI:
     eu-north-1:
-      AMI: ami-0d4e2b57f569e9daa
+      AMI: ami-0168b2054d2f38cc1
     ap-south-1:
-      AMI: ami-0c5b1a88222ac79cb
+      AMI: ami-090609133a86b9723
     eu-west-3:
-      AMI: ami-0e60c6afa19d896ee
+      AMI: ami-07f75642b87ea58ce
     eu-west-2:
-      AMI: ami-0917237b4e71c5759
+      AMI: ami-05c94e542948a2807
     eu-west-1:
-      AMI: ami-0dad359ff462124ca
+      AMI: ami-043847b30c32c01cf
     ap-northeast-2:
-      AMI: ami-0de407404c33d1671
+      AMI: ami-01e7286e8e09d809f
     ap-northeast-1:
-      AMI: ami-0c1ac8728ef7f87a4
+      AMI: ami-08455f1340543554c
     sa-east-1:
-      AMI: ami-001c16a3a4f5d85f1
+      AMI: ami-0d6806446a46f9b9c
     ca-central-1:
-      AMI: ami-08a6203f59f9df866
+      AMI: ami-07fa365b1f79fcbb1
     ap-southeast-1:
-      AMI: ami-0b8cf0f359b1335e1
+      AMI: ami-0ff297662c4840aa5
     ap-southeast-2:
-      AMI: ami-0a1a4d97d4af3009b
+      AMI: ami-0009ba887e00637bd
     eu-central-1:
-      AMI: ami-05c26ae4789875080
+      AMI: ami-05034a7fcbfe5d5af
     us-east-1:
-      AMI: ami-068663a3c619dd892
+      AMI: ami-022d4249382309a48
     us-east-2:
-      AMI: ami-0e84e211558a022c0
+      AMI: ami-03f4121463e28151e
     us-west-1:
-      AMI: ami-075fd582acf0c0128
+      AMI: ami-0fa12818adfd95e6e
     us-west-2:
-      AMI: ami-09dd2e08d601bff67
+      AMI: ami-0f81e6e71078b75b6
 
 Resources:
   InstanceSecurityGroup:
