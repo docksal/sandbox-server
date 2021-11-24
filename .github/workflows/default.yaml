@@ -1,0 +1,65 @@
+name: Publish Templates
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: # Allow manually triggering a build
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  AWS_REGION: us-east-2
+  AWS_ACCESS_KEY_ID: AKIAIPJXMNOEV65OMURA
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  S3_BUCKET: docksal-aws-templates
+  UPLOAD_DIR: sandbox-server
+  LOCAL_DIR: build
+
+jobs:
+  aws-templates:
+    name: "Publish: ${{ matrix.template }} template"
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false # Don't cancel other jobs if one fails
+      matrix:
+        template:
+          - basic
+          - advanced
+
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+#      -
+#        name: Environment variables
+#        run: |
+#          # Export variables for further steps
+#          echo "GIT_SHA7=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+#          echo "BUILD_CONTEXT=${VERSION:-.}" >> ${GITHUB_ENV}
+#          echo "BUILD_IMAGE_TAG=${IMAGE}:${VERSION_PREFIX}${VERSION}build" >> ${GITHUB_ENV}
+#      -
+#        name: Install AWS CLI
+#        run: |
+#          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+#          unzip awscliv2.zip
+#          sudo ./aws/install
+      -
+        name: Build and publish template
+        env:
+          TEMPLATE_TYPE: ${{ matrix.template }}
+        run: |
+          cd aws-cloudformation && ./scripts/bash2yaml startup-${TEMPLATE_TYPE}.sh tpl-${TEMPLATE_TYPE}.yaml
+          aws cloudformation package --template-file template.yaml --s3-bucket null --output-template-file package.json --use-json
+          mkdir -p ${LOCAL_DIR} && mv -f package.json ${LOCAL_DIR}/${TEMPLATE_TYPE}.json
+          tmp=$(basename $(mktemp -u))
+          aws s3 cp ${LOCAL_DIR}/${TEMPLATE_TYPE}.json s3://${S3_BUCKET}/${tmp} --acl public-read
+          res=$(aws cloudformation validate-template --region ${AWS_REGION} --template-url https://${S3_BUCKET}.s3.amazonaws.com/${tmp} || echo "error")
+          aws s3 rm s3://${S3_BUCKET}/${tmp}
+          if [ "${res}" == "error" ]; then exit 1; fi
+          ${GITHUB_WORKSPACE}/scripts/upload-to-s3.sh

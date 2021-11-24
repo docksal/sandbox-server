@@ -4,28 +4,29 @@
 
 is_edge ()
 {
-	[[ "${TRAVIS_BRANCH}" == "develop" ]]
+	[[ "${GITHUB_REF}" == "refs/heads/develop" ]]
 }
 
 is_stable ()
 {
-	[[ "${TRAVIS_BRANCH}" == "master" ]]
+	[[ "${GITHUB_REF}" == "refs/heads/master" ]]
 }
 
 is_release ()
 {
-	[[ "${TRAVIS_TAG}" != "" ]]
+	[[ "${GITHUB_REF}" =~ "refs/tags/" ]]
 }
 
 # Check whether the current build is for a pull request
 is_pr ()
 {
-	[[ "${TRAVIS_PULL_REQUEST}" != "false" ]]
+	# GITHUB_HEAD_REF is only set for pull requests
+	[[ "${GITHUB_HEAD_REF}" != "" ]]
 }
 # ---------------------------- #
 
 # Extract version parts from release tag
-IFS='.' read -a ver_arr <<< "$TRAVIS_TAG"
+IFS='.' read -a ver_arr <<< ${GITHUB_REF#refs/tags/}
 VERSION_MAJOR=${ver_arr[0]#v*}  # 2.7.0 => "2"
 VERSION_MINOR=${ver_arr[1]}  # "2.7.0" => "7"
 VERSION_HOTFIX=${ver_arr[2]}  # "2.7.0" => "0"
@@ -35,7 +36,7 @@ STABLE_UPLOAD_DIR=${UPLOAD_DIR}/stable
 RELEASE_UPLOAD_DIR_MAJOR=${UPLOAD_DIR}/v${VERSION_MAJOR}
 RELEASE_UPLOAD_DIR_MINOR=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}
 RELEASE_UPLOAD_DIR_HOTFIX=${UPLOAD_DIR}/v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_HOTFIX}
-BRANCH_UPLOAD_DIR=${UPLOAD_DIR}/branch/${TRAVIS_BRANCH}
+BRANCH_UPLOAD_DIR=${UPLOAD_DIR}/branch/${GITHUB_REF#refs/heads/}
 
 # Skip pull request
 is_pr && exit 0
