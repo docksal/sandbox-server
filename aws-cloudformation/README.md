@@ -74,6 +74,7 @@ You will be prompted for a few required and optional settings.
 - VPC/Network: Optional
   - VPC ID
   - Subnet ID
+  - Security Group ID
   - Elastic IP
   - Access from CIDR 1
   - Access from CIDR 2
@@ -209,14 +210,23 @@ This feature is available in the [advanced template](#advanced) only.
 
 Allows specifying the custom VPC ID and Subnet ID where the server will be attached.
 
-<a name="access-ip"></a>
-### Access restriction by IP range
+<a name="security-group"></a>
+### Attach a custom Security Group
 
 This feature is available in the [advanced template](#advanced) only.
 
-Allows restricting access to the server (ports `22`, `80`, `443`) by IP range.
+Attaches an existing Security Group (ingress/egress firewall rules) to the sandbox server instance.
 
-Defaults to `0.0.0.0/0` (unrestricted access).
+Can be used instead of or in conjunction with the IP based ingress restrictions (see below).
+
+<a name="access-ip"></a>
+### Access restriction by IP range (CIDR)
+
+This feature is available in the [advanced template](#advanced) only.
+
+Restricts access to the sandbox server instance (ports `22`, `80`, `443`) by IP range (CIDR).
+
+Defaults to `0.0.0.0/0` (unrestricted access). Supports up to 3 CIDRs.
 
 <a name="access-ssh"></a>
 ### Manage SSH access via Github org/team
