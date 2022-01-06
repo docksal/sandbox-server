@@ -95,10 +95,6 @@ Parameters:
       Required if using non-default VPC.
     Type: String
     Default: ""
-  SecurityGroupId:
-    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
-    Type: String
-    Default: ""
   ExistingEIP:
     Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
     Type: String
@@ -116,6 +112,18 @@ Parameters:
   AccessFrom3:
     Description: |
       CIDR block to allow ingress access to the instance. Leave empty all Access From fields for unrestricted access.
+    Type: String
+    Default: ""
+  SecurityGroupId1:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
+  SecurityGroupId2:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
+  SecurityGroupId3:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
     Type: String
     Default: ""
   ExistingDataVolume:
@@ -184,11 +192,13 @@ Metadata:
         Parameters:
           - VpcId
           - SubnetId
-          - SecurityGroupId
           - ExistingEIP
           - AccessFrom1
           - AccessFrom2
           - AccessFrom3
+          - SecurityGroupId1
+          - SecurityGroupId2
+          - SecurityGroupId3
       - Label:
           default: "Storage: Optional"
         Parameters:
@@ -225,8 +235,6 @@ Metadata:
         default: "VPC ID"
       SubnetId:
         default: "Subnet ID"
-      SecurityGroupId:
-        default: "Security Group ID"
       ExistingEIP:
         default: "Elastic IP"
       AccessFrom1:
@@ -235,6 +243,12 @@ Metadata:
         default: "Access from CIDR 2"
       AccessFrom3:
         default: "Access from CIDR 3"
+      SecurityGroupId1:
+        default: "Security Group ID 1"
+      SecurityGroupId2:
+        default: "Security Group ID 2"
+      SecurityGroupId3:
+        default: "Security Group ID 3"
       ExistingDataVolume:
         default: "Persistent data volume"
       EnableArtifactsBucket:
@@ -296,7 +310,6 @@ Conditions:
   ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
-  SecurityGroupIdDefined: !Not [!Equals [!Ref SecurityGroupId, ""]]
   ExistingEIPNotDefined: !Equals [!Ref ExistingEIP, ""]
   # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
   Route53Defined: !And
@@ -306,6 +319,9 @@ Conditions:
   AccessFrom2Defined: !Not [ !Equals [!Ref AccessFrom2, ""] ]
   AccessFrom3Defined: !Not [ !Equals [!Ref AccessFrom3, ""] ]
   AccessFromUnDefined: !Not [ !Or [ Condition: AccessFrom1Defined, Condition: AccessFrom2Defined, Condition: AccessFrom3Defined ] ]
+  SecurityGroupId1Defined: !Not [!Equals [!Ref SecurityGroupId1, ""]]
+  SecurityGroupId2Defined: !Not [!Equals [!Ref SecurityGroupId2, ""]]
+  SecurityGroupId3Defined: !Not [!Equals [!Ref SecurityGroupId3, ""]]
 
 Resources:
   EIP:
@@ -627,7 +643,9 @@ Resources:
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
-              - GroupId: !If [ SecurityGroupIdDefined, !Ref SecurityGroupId, !Ref "AWS::NoValue" ]
+              - GroupId: !If [ SecurityGroupId1Defined, !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
+              - GroupId: !If [ SecurityGroupId2Defined, !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
+              - GroupId: !If [ SecurityGroupId3Defined, !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
             BlockDeviceMappings:
             # Root volume
               - DeviceName: /dev/sda1
@@ -661,7 +679,10 @@ Resources:
         Value: !Ref AWS::StackId
       SecurityGroupIds:
         - !GetAtt InstanceSecurityGroup.GroupId
-        - !If [ SecurityGroupIdDefined, !Ref SecurityGroupId, !Ref "AWS::NoValue" ]
+        - !If [ SecurityGroupId1Defined, !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
+        - !If [ SecurityGroupId2Defined, !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
+        - !If [ SecurityGroupId3Defined, !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
+
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
