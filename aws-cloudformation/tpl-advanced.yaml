@@ -95,6 +95,10 @@ Parameters:
       Required if using non-default VPC.
     Type: String
     Default: ""
+  SecurityGroupId:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
   ExistingEIP:
     Description: "Use an existing Elastic IP for the instance (x.x.x.x)"
     Type: String
@@ -180,6 +184,7 @@ Metadata:
         Parameters:
           - VpcId
           - SubnetId
+          - SecurityGroupId
           - ExistingEIP
           - AccessFrom1
           - AccessFrom2
@@ -220,6 +225,8 @@ Metadata:
         default: "VPC ID"
       SubnetId:
         default: "Subnet ID"
+      SecurityGroupId:
+        default: "Security Group ID"
       ExistingEIP:
         default: "Elastic IP"
       AccessFrom1:
@@ -289,6 +296,7 @@ Conditions:
   ArtifactsBucketNameDefined: !Not [!Equals [!Ref ArtifactsBucketName, ""]]
   VpcIdDefined: !Not [!Equals [!Ref VpcId, ""]]
   SubnetIdDefined: !Not [!Equals [!Ref SubnetId, ""]]
+  SecurityGroupIdDefined: !Not [!Equals [!Ref SecurityGroupId, ""]]
   ExistingEIPNotDefined: !Equals [!Ref ExistingEIP, ""]
   # When LE domain is set but the LE config is empty, we give the EC2 instance access to manage TXT records in Route53.
   Route53Defined: !And
@@ -619,6 +627,7 @@ Resources:
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
+              - GroupId: !If [ SecurityGroupIdDefined, !Ref SecurityGroupId, !Ref "AWS::NoValue" ]
             BlockDeviceMappings:
             # Root volume
               - DeviceName: /dev/sda1
@@ -652,6 +661,7 @@ Resources:
         Value: !Ref AWS::StackId
       SecurityGroupIds:
         - !GetAtt InstanceSecurityGroup.GroupId
+        - !If [ SecurityGroupIdDefined, !Ref SecurityGroupId, !Ref "AWS::NoValue" ]
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
