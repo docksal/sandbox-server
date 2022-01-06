@@ -614,9 +614,9 @@ Resources:
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
-              - GroupId: !If [ SecurityGroupId1Defined, !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
-              - GroupId: !If [ SecurityGroupId2Defined, !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
-              - GroupId: !If [ SecurityGroupId3Defined, !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
+              - !If [ SecurityGroupId1Defined, GroupId: !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
+              - !If [ SecurityGroupId2Defined, GroupId: !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
+              - !If [ SecurityGroupId3Defined, GroupId: !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
             BlockDeviceMappings:
             # Root volume
               - DeviceName: /dev/sda1
