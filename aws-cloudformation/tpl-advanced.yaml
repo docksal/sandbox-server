@@ -269,39 +269,10 @@ Metadata:
         default: "Docksal version"
 
 Mappings:
-  Region2AMI:
-    eu-north-1:
-      AMI: ami-0168b2054d2f38cc1
-    ap-south-1:
-      AMI: ami-090609133a86b9723
-    eu-west-3:
-      AMI: ami-07f75642b87ea58ce
-    eu-west-2:
-      AMI: ami-05c94e542948a2807
-    eu-west-1:
-      AMI: ami-043847b30c32c01cf
-    ap-northeast-2:
-      AMI: ami-01e7286e8e09d809f
-    ap-northeast-1:
-      AMI: ami-08455f1340543554c
-    sa-east-1:
-      AMI: ami-0d6806446a46f9b9c
-    ca-central-1:
-      AMI: ami-07fa365b1f79fcbb1
-    ap-southeast-1:
-      AMI: ami-0ff297662c4840aa5
-    ap-southeast-2:
-      AMI: ami-0009ba887e00637bd
-    eu-central-1:
-      AMI: ami-05034a7fcbfe5d5af
-    us-east-1:
-      AMI: ami-022d4249382309a48
-    us-east-2:
-      AMI: ami-03f4121463e28151e
-    us-west-1:
-      AMI: ami-0fa12818adfd95e6e
-    us-west-2:
-      AMI: ami-0f81e6e71078b75b6
+  Variables:
+    LatestAmiId:
+      # Get the latest AMI ID from Canonical's public Systems Manager Parameter
+      Value: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
 
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
@@ -639,7 +610,7 @@ Resources:
                 Tags:
                 - Key: StackId
                   Value: !Ref AWS::StackId
-            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+            ImageId: !FindInMap [Variables, LatestAmiId, Value]
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
@@ -672,7 +643,7 @@ Resources:
       IamInstanceProfile: !Ref ec2InstanceProfile
       InstanceType: !Ref InstanceType
       AvailabilityZone: !Ref ManualAZ
-      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      ImageId: !FindInMap [Variables, LatestAmiId, Value]
       KeyName: !Ref KeyName
       Tags:
       - Key: StackId
