@@ -599,10 +599,7 @@ Resources:
           - &instance-profile
             InstanceType: !Ref InstanceType
             IamInstanceProfile:
-              Arn:
-                Fn::GetAtt:
-                  - spotInstanceProfile
-                  - Arn
+              Arn: !GetAtt spotInstanceProfile.Arn
             Placement:
               AvailabilityZone: !Ref ManualAZ
             TagSpecifications:
