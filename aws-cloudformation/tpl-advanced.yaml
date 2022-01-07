@@ -114,6 +114,18 @@ Parameters:
       CIDR block to allow ingress access to the instance. Leave empty all Access From fields for unrestricted access.
     Type: String
     Default: ""
+  SecurityGroupId1:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
+  SecurityGroupId2:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
+  SecurityGroupId3:
+    Description: "Attach an existing security group (ID) to the instance (sg-xyz...)"
+    Type: String
+    Default: ""
   ExistingDataVolume:
     Description: |
       Use an existing EBS volume for instance persistent storage.
@@ -184,6 +196,9 @@ Metadata:
           - AccessFrom1
           - AccessFrom2
           - AccessFrom3
+          - SecurityGroupId1
+          - SecurityGroupId2
+          - SecurityGroupId3
       - Label:
           default: "Storage: Optional"
         Parameters:
@@ -228,6 +243,12 @@ Metadata:
         default: "Access from CIDR 2"
       AccessFrom3:
         default: "Access from CIDR 3"
+      SecurityGroupId1:
+        default: "Security Group ID 1"
+      SecurityGroupId2:
+        default: "Security Group ID 2"
+      SecurityGroupId3:
+        default: "Security Group ID 3"
       ExistingDataVolume:
         default: "Persistent data volume"
       EnableArtifactsBucket:
@@ -248,39 +269,10 @@ Metadata:
         default: "Docksal version"
 
 Mappings:
-  Region2AMI:
-    eu-north-1:
-      AMI: ami-0168b2054d2f38cc1
-    ap-south-1:
-      AMI: ami-090609133a86b9723
-    eu-west-3:
-      AMI: ami-07f75642b87ea58ce
-    eu-west-2:
-      AMI: ami-05c94e542948a2807
-    eu-west-1:
-      AMI: ami-043847b30c32c01cf
-    ap-northeast-2:
-      AMI: ami-01e7286e8e09d809f
-    ap-northeast-1:
-      AMI: ami-08455f1340543554c
-    sa-east-1:
-      AMI: ami-0d6806446a46f9b9c
-    ca-central-1:
-      AMI: ami-07fa365b1f79fcbb1
-    ap-southeast-1:
-      AMI: ami-0ff297662c4840aa5
-    ap-southeast-2:
-      AMI: ami-0009ba887e00637bd
-    eu-central-1:
-      AMI: ami-05034a7fcbfe5d5af
-    us-east-1:
-      AMI: ami-022d4249382309a48
-    us-east-2:
-      AMI: ami-03f4121463e28151e
-    us-west-1:
-      AMI: ami-0fa12818adfd95e6e
-    us-west-2:
-      AMI: ami-0f81e6e71078b75b6
+  Variables:
+    LatestAmiId:
+      # Get the latest AMI ID from Canonical's public Systems Manager Parameter
+      Value: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
 
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
@@ -298,6 +290,9 @@ Conditions:
   AccessFrom2Defined: !Not [ !Equals [!Ref AccessFrom2, ""] ]
   AccessFrom3Defined: !Not [ !Equals [!Ref AccessFrom3, ""] ]
   AccessFromUnDefined: !Not [ !Or [ Condition: AccessFrom1Defined, Condition: AccessFrom2Defined, Condition: AccessFrom3Defined ] ]
+  SecurityGroupId1Defined: !Not [!Equals [!Ref SecurityGroupId1, ""]]
+  SecurityGroupId2Defined: !Not [!Equals [!Ref SecurityGroupId2, ""]]
+  SecurityGroupId3Defined: !Not [!Equals [!Ref SecurityGroupId3, ""]]
 
 Resources:
   EIP:
@@ -604,10 +599,7 @@ Resources:
           - &instance-profile
             InstanceType: !Ref InstanceType
             IamInstanceProfile:
-              Arn:
-                Fn::GetAtt:
-                  - spotInstanceProfile
-                  - Arn
+              Arn: !GetAtt spotInstanceProfile.Arn
             Placement:
               AvailabilityZone: !Ref ManualAZ
             TagSpecifications:
@@ -615,10 +607,13 @@ Resources:
                 Tags:
                 - Key: StackId
                   Value: !Ref AWS::StackId
-            ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+            ImageId: !FindInMap [Variables, LatestAmiId, Value]
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
+              - !If [ SecurityGroupId1Defined, GroupId: !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
+              - !If [ SecurityGroupId2Defined, GroupId: !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
+              - !If [ SecurityGroupId3Defined, GroupId: !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
             BlockDeviceMappings:
             # Root volume
               - DeviceName: /dev/sda1
@@ -645,13 +640,17 @@ Resources:
       IamInstanceProfile: !Ref ec2InstanceProfile
       InstanceType: !Ref InstanceType
       AvailabilityZone: !Ref ManualAZ
-      ImageId: !FindInMap [Region2AMI, !Ref "AWS::Region", AMI]
+      ImageId: !FindInMap [Variables, LatestAmiId, Value]
       KeyName: !Ref KeyName
       Tags:
       - Key: StackId
         Value: !Ref AWS::StackId
       SecurityGroupIds:
         - !GetAtt InstanceSecurityGroup.GroupId
+        - !If [ SecurityGroupId1Defined, !Ref SecurityGroupId1, !Ref "AWS::NoValue" ]
+        - !If [ SecurityGroupId2Defined, !Ref SecurityGroupId2, !Ref "AWS::NoValue" ]
+        - !If [ SecurityGroupId3Defined, !Ref SecurityGroupId3, !Ref "AWS::NoValue" ]
+
       BlockDeviceMappings:
         # Root volume
         - DeviceName: /dev/sda1
