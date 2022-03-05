@@ -60,7 +60,7 @@ If you have an existing AWS account (with billing and an SSH key pair), just cli
 **WARNING:** if you have an existing sandbox server created before Dec 31, 2019 (v1), **DO NOT UPGRADE**.  
 See [v2.0.0](https://github.com/docksal/sandbox-server/releases/tag/v2.0.0) release notes.
 
-[![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://docksal-aws-templates.s3.us-east-2.amazonaws.com/sandbox-server/v3.2.0/advanced.json)
+[![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://s3.us-east-2.amazonaws.com/docksal-aws-templates/sandbox-server/v3.2.0/advanced.json)
 
 You will be prompted for a few required and optional settings.
 
