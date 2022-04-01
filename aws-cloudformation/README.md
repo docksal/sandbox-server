@@ -11,6 +11,8 @@ AWS CloudFormation handles all of that.
 
 For an overview of AWS CloudFormation, see the [AWS CloudFormation User Guide](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html.)
 
+See [Releases](https://github.com/docksal/sandbox-server/releases) for the most recent AWS CloudFormation template links.
+
 <a name="features"></a>
 ## Features
 
@@ -27,7 +29,6 @@ For an overview of AWS CloudFormation, see the [AWS CloudFormation User Guide](h
   - [Access restriction by IP range](#access-ip)
   - [Manage SSH access via Github org/team](#access-ssh)
 
-
 <a name="basic"></a>
 ## Basic mode: Quick setup (using CloudFormation web UI)
 
@@ -36,7 +37,7 @@ If you have an existing AWS account (with billing and an SSH key pair), just cli
 **WARNING:** if you have an existing sandbox server created before Dec 31, 2019 (v1), **DO NOT UPGRADE**.  
 See [v2.0.0](https://github.com/docksal/sandbox-server/releases/tag/v2.0.0) release notes.
 
-[![Launch Basic Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://docksal-aws-templates.s3.us-east-2.amazonaws.com/sandbox-server/v3.3.0/basic.json) (v3.3.0)
+[![Launch Basic Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://docksal-aws-templates.s3.us-east-2.amazonaws.com/sandbox-server/v3.3.0/basic.json)
 
 You will be prompted for:
 
@@ -60,7 +61,7 @@ If you have an existing AWS account (with billing and an SSH key pair), just cli
 **WARNING:** if you have an existing sandbox server created before Dec 31, 2019 (v1), **DO NOT UPGRADE**.  
 See [v2.0.0](https://github.com/docksal/sandbox-server/releases/tag/v2.0.0) release notes.
 
-[![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://docksal-aws-templates.s3.us-east-2.amazonaws.com/sandbox-server/v3.3.0/advanced.json) (v3.3.0)
+[![Launch Advanced Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=docksal-sandbox-server&templateURL=https://docksal-aws-templates.s3.us-east-2.amazonaws.com/sandbox-server/v3.3.0/advanced.json)
 
 You will be prompted for a few required and optional settings.
 
