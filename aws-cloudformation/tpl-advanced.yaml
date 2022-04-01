@@ -19,9 +19,6 @@ Parameters:
       EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM).
       t3 (Intel) / t3a (AMD) family instances provide burstable CPU performance and are generally the best choise for a sandbox server.
       t3/t3a: CPU/RAM ratio is variable from 1/1 to 1/4 based on instance size (t3.large = 2 vCPU, 8GB RAM).
-      c5: CPU/RAM ratio is 1/2 (c5.large = 2 vCPU, 4GB RAM).
-      m5: CPU/RAM ratio is 1/4 (m5.large = 2 vCPU, 8GB RAM).
-      r5: CPU/RAM ratio is 1/8 (r5.large = 2 vCPU, 16GB RAM).
     Type: String
     Default: t3.small
     AllowedValues:
@@ -35,17 +32,6 @@ Parameters:
       - t3a.large
       - t3a.xlarge
       - t3a.2xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c5.4xlarge
-      - m5.large
-      - m5.xlarge
-      - m5.2xlarge
-      - m5.4xlarge
-      - r5.large
-      - r5.xlarge
-      - r5.2xlarge
   InstanceType2:
     Description: |
       Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
@@ -64,17 +50,6 @@ Parameters:
       - t3a.large
       - t3a.xlarge
       - t3a.2xlarge
-      - c5.large
-      - c5.xlarge
-      - c5.2xlarge
-      - c5.4xlarge
-      - m5.large
-      - m5.xlarge
-      - m5.2xlarge
-      - m5.4xlarge
-      - r5.large
-      - r5.xlarge
-      - r5.2xlarge
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
