@@ -14,11 +14,22 @@ Parameters:
     AllowedValues:
       - ec2
       - spot
+  InstanceArch:
+    Description: |
+      EC2 instance architecture.
+      Use "amd64" for t3/t3a and "arm64" for t4g instance types.
+      IMPORTANT: Instance will fail to start if architecture and type (below) are mismatched.
+    Type: String
+    Default: amd64
+    AllowedValues:
+      - amd64
+      - arm64
   InstanceType:
     Description: |
       EC2 instance type (default: t3.small = 2 vCPU, 2GB RAM).
       t3 (Intel) / t3a (AMD) family instances provide burstable CPU performance and are generally the best choise for a sandbox server.
-      t3/t3a: CPU/RAM ratio is variable from 1/1 to 1/4 based on instance size (t3.large = 2 vCPU, 8GB RAM).
+      t4g (ARM64) family instances deliver up to 40% better price performance over T3 instances.
+      t3/t3a/t4g: CPU/RAM ratio is variable from 1/1 to 1/4 based on instance size (t3.large = 2 vCPU, 8GB RAM).
     Type: String
     Default: t3.small
     AllowedValues:
@@ -32,11 +43,17 @@ Parameters:
       - t3a.large
       - t3a.xlarge
       - t3a.2xlarge
+      - t4g.small
+      - t4g.medium
+      - t4g.large
+      - t4g.xlarge
+      - t4g.2xlarge
   InstanceType2:
     Description: |
       Additional EC2 instance type (spot mode only). AWS will pick the cheapest available option for spot instance.
       IMPORTANT: "Instance Type"/"Instance Type 2" must be unique, overwise stack creation/update will fail.
       Recomendation: Use a "t3" instance for the primary option and a matching size "t3a" instance type here.
+      Do not mix Intel/AMD with ARM64 (g) instances unless you know what you are doing.
     Type: String
     Default: t3.medium
     AllowedValues:
@@ -50,6 +67,11 @@ Parameters:
       - t3a.large
       - t3a.xlarge
       - t3a.2xlarge
+      - t4g.small
+      - t4g.medium
+      - t4g.large
+      - t4g.xlarge
+      - t4g.2xlarge
   KeyName:
     Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
     Type: "AWS::EC2::KeyPair::KeyName"
@@ -158,6 +180,7 @@ Metadata:
           default: "Basic: Required"
         Parameters:
           - ResourceType
+          - InstanceArch
           - InstanceType
           - InstanceType2
           - KeyName
@@ -198,6 +221,8 @@ Metadata:
     ParameterLabels:
       ResourceType:
         default: "Resource type"
+      InstanceArch:
+        default: "Instance architecture"
       InstanceType:
         default: "Instance type (primary)"
       InstanceType2:
@@ -247,7 +272,8 @@ Mappings:
   Variables:
     LatestAmiId:
       # Get the latest AMI ID from Canonical's public Systems Manager Parameter
-      Value: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
+      amd64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
+      arm64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/arm64/hvm/ebs-gp2/ami-id}}"
 
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
@@ -582,7 +608,7 @@ Resources:
                 Tags:
                 - Key: StackId
                   Value: !Ref AWS::StackId
-            ImageId: !FindInMap [Variables, LatestAmiId, Value]
+            ImageId: !FindInMap [Variables, LatestAmiId, !Ref InstanceArch]
             KeyName: !Ref KeyName
             SecurityGroups:
               - GroupId: !GetAtt InstanceSecurityGroup.GroupId
@@ -615,7 +641,7 @@ Resources:
       IamInstanceProfile: !Ref ec2InstanceProfile
       InstanceType: !Ref InstanceType
       AvailabilityZone: !Ref ManualAZ
-      ImageId: !FindInMap [Variables, LatestAmiId, Value]
+      ImageId: !FindInMap [Variables, LatestAmiId, !Ref InstanceArch]
       KeyName: !Ref KeyName
       Tags:
       - Key: StackId
