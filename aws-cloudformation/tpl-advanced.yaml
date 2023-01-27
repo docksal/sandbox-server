@@ -272,8 +272,8 @@ Mappings:
   Variables:
     LatestAmiId:
       # Get the latest AMI ID from Canonical's public Systems Manager Parameter
-      amd64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
-      arm64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/20.04/stable/current/arm64/hvm/ebs-gp2/ami-id}}"
+      amd64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id}}"
+      arm64: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id}}"
 
 Conditions:
   CreateEC2: !Equals [!Ref ResourceType, "ec2"]
