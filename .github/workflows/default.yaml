@@ -23,7 +23,7 @@ env:
 jobs:
   aws-templates:
     name: "Publish: ${{ matrix.template }} template"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     strategy:
       fail-fast: false # Don't cancel other jobs if one fails
@@ -35,7 +35,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 #      -
 #        name: Environment variables
 #        run: |
